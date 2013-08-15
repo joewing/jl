@@ -54,6 +54,7 @@ static JLValue *AddFunc(JLContext *context, JLValue *value);
 static JLValue *SubFunc(JLContext *context, JLValue *value);
 static JLValue *MulFunc(JLContext *context, JLValue *value);
 static JLValue *DivFunc(JLContext *context, JLValue *value);
+static JLValue *ConsFunc(JLContext *context, JLValue *value);
 static JLValue *DefineFunc(JLContext *context, JLValue *value);
 static JLValue *HeadFunc(JLContext *context, JLValue *value);
 static JLValue *IfFunc(JLContext *context, JLValue *value);
@@ -73,6 +74,7 @@ static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "-",         SubFunc     },
    { "*",         MulFunc     },
    { "/",         DivFunc     },
+   { "cons",      ConsFunc    },
    { "define",    DefineFunc  },
    { "head",      HeadFunc    },
    { "if",        IfFunc      },
@@ -92,8 +94,8 @@ JLValue *EqFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number == vb->number) {
-            result->number = 1.0;
+         if(va->value.number == vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -109,8 +111,8 @@ JLValue *NeFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number != vb->number) {
-            result->number = 1.0;
+         if(va->value.number != vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -126,8 +128,8 @@ JLValue *GtFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number > vb->number) {
-            result->number = 1.0;
+         if(va->value.number > vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -143,8 +145,8 @@ JLValue *GeFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number >= vb->number) {
-            result->number = 1.0;
+         if(va->value.number >= vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -160,8 +162,8 @@ JLValue *LtFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number < vb->number) {
-            result->number = 1.0;
+         if(va->value.number < vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -177,8 +179,8 @@ JLValue *LeFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == JLVALUE_NUMBER) {
          JLValue *result = JLDefineNumber(context, NULL, 0.0);
-         if(va->number <= vb->number) {
-            result->number = 1.0;
+         if(va->value.number <= vb->value.number) {
+            result->value.number = 1.0;
          }
          return result;
       }
@@ -193,7 +195,7 @@ JLValue *AddFunc(JLContext *context, JLValue *args)
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg) {
-         result->number += arg->number;
+         result->value.number += arg->value.number;
       }
    }
    return result;
@@ -207,12 +209,12 @@ JLValue *SubFunc(JLContext *context, JLValue *args)
    if(vp) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->number = arg->number;
+         result->value.number = arg->value.number;
       }
       for(vp = vp->next; vp; vp = vp->next) {
          arg = JLEvaluate(context, vp);
          if(arg) {
-            result->number -= arg->number;
+            result->value.number -= arg->value.number;
          }
       }
    }
@@ -226,7 +228,7 @@ JLValue *MulFunc(JLContext *context, JLValue *args)
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg) {
-         result->number *= arg->number;
+         result->value.number *= arg->value.number;
       }
    }
    return result;
@@ -240,16 +242,41 @@ JLValue *DivFunc(JLContext *context, JLValue *args)
    if(vp) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->number = arg->number;
+         result->value.number = arg->value.number;
       }
       for(vp = vp->next; vp; vp = vp->next) {
          arg = JLEvaluate(context, vp);
          if(arg) {
-            result->number /= arg->number;
+            result->value.number /= arg->value.number;
          }
       }
    }
    return result;
+}
+
+JLValue *ConsFunc(JLContext *context, JLValue *args)
+{
+   JLValue *value = JLEvaluate(context, args->next);
+   if(value) {
+      JLValue *result = (JLValue*)malloc(sizeof(JLValue));
+      JLValue *head = (JLValue*)malloc(sizeof(JLValue));
+      JLValue *rest = JLEvaluate(context, args->next->next);
+
+      head->value = value->value;
+      head->tag   = value->tag;
+      if(rest && rest->tag == JLVALUE_LIST) {
+         head->next = rest->value.lst;
+      } else {
+         head->next = NULL;
+      }
+
+      result->tag = JLVALUE_LIST;
+      result->next = NULL;
+      result->value.lst = head;
+
+      return result;
+   }
+   return NULL;
 }
 
 JLValue *DefineFunc(JLContext *context, JLValue *args)
@@ -264,8 +291,8 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
       scope->bindings = binding;
       result = JLEvaluate(context, vp->next);
       binding->value = result;
-      binding->name = (char*)malloc(strlen(vp->str) + 1);
-      strcpy(binding->name, vp->str);
+      binding->name = (char*)malloc(strlen(vp->value.str) + 1);
+      strcpy(binding->name, vp->value.str);
    }
    return result;
 }
@@ -274,7 +301,7 @@ JLValue *HeadFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = JLEvaluate(context, args->next);
    if(vp && vp->tag == JLVALUE_LIST) {
-      return vp->lst;
+      return vp->value.lst;
    } else {
       return NULL;
    }
@@ -285,7 +312,7 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
    JLValue *vp = args->next;
    if(vp) {
       JLValue *cond = JLEvaluate(context, vp);
-      if(cond && (cond->tag != JLVALUE_NUMBER || cond->number != 0.0)) {
+      if(cond && (cond->tag != JLVALUE_NUMBER || cond->value.number != 0.0)) {
          /* true */
          return JLEvaluate(context, vp->next);
       } else if(vp->next) {
@@ -299,7 +326,7 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
 JLValue *LambdaFunc(JLContext *context, JLValue *value)
 {
    JLValue *result = CreateValue(context, NULL, JLVALUE_LAMBDA);
-   result->lst = value->next;
+   result->value.lst = value->next;
    return result;
 }
 
@@ -311,14 +338,14 @@ JLValue *LetFunc(JLContext *context, JLValue *args)
    JLValue *result;
    if(!vp ||
       vp->tag != JLVALUE_LIST ||
-      vp->lst->tag != JLVALUE_STRING ||
-      !vp->lst->next) {
+      vp->value.lst->tag != JLVALUE_STRING ||
+      !vp->value.lst->next) {
       return args;
    }
-   name = vp->lst;
-   value = JLEvaluate(context, vp->lst->next);
+   name = vp->value.lst;
+   value = JLEvaluate(context, vp->value.lst->next);
    EnterScope(context);
-   JLDefineValue(context, name->str, value);
+   JLDefineValue(context, name->value.str, value);
    result = value;
    for(vp = vp->next; vp; vp = vp->next) {
       result = JLEvaluate(context, vp);
@@ -331,18 +358,18 @@ JLValue *ListFunc(JLContext *context, JLValue *args)
 {
    JLValue *result = (JLValue*)malloc(sizeof(JLValue));
    result->tag = JLVALUE_LIST;
-   result->lst = args->next;
+   result->value.lst = args->next;
    return result;
 }
 
 JLValue *RestFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST && vp->lst) {
+   if(vp && vp->tag == JLVALUE_LIST && vp->value.lst) {
       JLValue *result = (JLValue*)malloc(sizeof(JLValue));
       result->tag = JLVALUE_LIST;
       result->next = NULL;
-      result->lst = vp->lst->next;
+      result->value.lst = vp->value.lst->next;
       return result;
    } else {
       return NULL;
@@ -365,13 +392,13 @@ void DestroyValue(JLValue *value)
 return;
    switch(value->tag) {
    case JLVALUE_LIST:
-      DestroyValue(value->lst);
+      DestroyValue(value->value.lst);
       break;
    case JLVALUE_STRING:
-      free(value->str);
+      free(value->value.str);
       break;
    case JLVALUE_LAMBDA:
-      DestroyValue(value->lst);
+      DestroyValue(value->value.lst);
       break;
    default:
       break;
@@ -439,7 +466,7 @@ JLValue *JLDefineSpecial(JLContext *context,
                          JLFunction func)
 {
    JLValue *result = CreateValue(context, name, JLVALUE_SPECIAL);
-   result->special = func;
+   result->value.special = func;
    return result;
 }
 
@@ -448,7 +475,7 @@ JLValue *JLDefineNumber(JLContext *context,
                         float value)
 {
    JLValue *result = CreateValue(context, name, JLVALUE_NUMBER);
-   result->number = value;
+   result->value.number = value;
    return result;
 }
 
@@ -474,16 +501,16 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
    if(value == NULL) {
       return NULL;
    } else if(value->tag == JLVALUE_LIST &&
-      value->lst &&
-      value->lst->tag == JLVALUE_STRING) {
-      JLValue *temp = Lookup(context, value->lst->str);
+      value->value.lst &&
+      value->value.lst->tag == JLVALUE_STRING) {
+      JLValue *temp = Lookup(context, value->value.lst->value.str);
       if(temp) {
          switch(temp->tag) {
          case JLVALUE_SPECIAL:
-            result = (temp->special)(context, value->lst);
+            result = (temp->value.special)(context, value->value.lst);
             break;
          case JLVALUE_LAMBDA:
-            result = EvalLambda(context, temp, value->lst);
+            result = EvalLambda(context, temp, value->value.lst);
             break;
          default:
             result = JLEvaluate(context, temp);
@@ -493,15 +520,17 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
          int i;
          result = value;
          for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
-            if(!strcmp(INTERNAL_FUNCTIONS[i].name, value->lst->str)) {
-               result = (INTERNAL_FUNCTIONS[i].function)(context, value->lst);
+            if(!strcmp(INTERNAL_FUNCTIONS[i].name,
+                       value->value.lst->value.str)) {
+               result = (INTERNAL_FUNCTIONS[i].function)(context,
+                                                         value->value.lst);
                break;
             }
          }
       }
 
    } else if(value->tag == JLVALUE_STRING) {
-      JLValue *temp = Lookup(context, value->str);
+      JLValue *temp = Lookup(context, value->value.str);
       if(temp) {
          result = temp;
       } else {
@@ -535,13 +564,13 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
     * the number of parameters to the lambda. */
 
    /* Make sure the lambda is well-defined. */
-   if(lambda->lst == NULL ||
-      lambda->lst->tag != JLVALUE_LIST) {
+   if(lambda->value.lst == NULL ||
+      lambda->value.lst->tag != JLVALUE_LIST) {
       ParseError(context, "invalid lambda");
       return NULL;
    }
-   params = lambda->lst->lst;
-   code = lambda->lst->next;
+   params = lambda->value.lst->value.lst;
+   code = lambda->value.lst->next;
 
    /* Insert bindings. */
    EnterScope(context);
@@ -558,7 +587,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
          LeaveScope(context);
          return NULL;
       }
-      JLDefineValue(context, bp->str, JLEvaluate(context, ap));
+      JLDefineValue(context, bp->value.str, JLEvaluate(context, ap));
       bp = bp->next;
       ap = ap->next;
    }
@@ -587,8 +616,8 @@ JLValue *Parse(JLContext *context, const char **line)
    result = (JLValue*)malloc(sizeof(JLValue));
    result->tag = JLVALUE_LIST;
    result->next = NULL;
-   result->lst = NULL;
-   item = &result->lst;
+   result->value.lst = NULL;
+   item = &result->value.lst;
 
    if(**line == 0) {
       return result;
@@ -643,7 +672,7 @@ JLValue *Parse(JLContext *context, const char **line)
       case '9':
          *item = (JLValue*)malloc(sizeof(JLValue));
          (*item)->tag = JLVALUE_NUMBER;
-         (*item)->number = strtof(*line, &temp);
+         (*item)->value.number = strtof(*line, &temp);
          *line = temp;
          item = &(*item)->next;
          break;
@@ -663,7 +692,7 @@ JLValue *Parse(JLContext *context, const char **line)
          }
          *item = (JLValue*)malloc(sizeof(JLValue));
          (*item)->tag = JLVALUE_STRING;
-         (*item)->str = temp;
+         (*item)->value.str = temp;
          item = &(*item)->next;
       }
    }
@@ -720,14 +749,14 @@ void JLPrint(const JLContext *context, const JLValue *value)
    }
    switch(value->tag) {
    case JLVALUE_NUMBER:
-      printf("%g", value->number);
+      printf("%g", value->value.number);
       break;
    case JLVALUE_STRING:
-      printf("\"%s\"", value->str);
+      printf("\"%s\"", value->value.str);
       break;
    case JLVALUE_LIST:
       printf("(");
-      for(temp = value->lst; temp; temp = temp->next) {
+      for(temp = value->value.lst; temp; temp = temp->next) {
          JLPrint(context, temp);
          if(temp->next) {
             printf(" ");
@@ -737,7 +766,7 @@ void JLPrint(const JLContext *context, const JLValue *value)
       break;
    case JLVALUE_LAMBDA:
       printf("(lambda ");
-      for(temp = value->lst; temp; temp = temp->next) {
+      for(temp = value->value.lst; temp; temp = temp->next) {
          JLPrint(context, temp);
          if(temp->next) {
             printf(" ");
@@ -746,7 +775,7 @@ void JLPrint(const JLContext *context, const JLValue *value)
       printf(")");
       break;
    case JLVALUE_SPECIAL:
-      printf("@%p", value->special);
+      printf("@%p", value->value.special);
       break;
    default:
       printf("\n?\n");

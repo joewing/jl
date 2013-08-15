@@ -44,6 +44,7 @@ The following built-in functions are available:
  - *        Return the produce of a list
  - /        Divide
  - list     Create a list
+ - cons     Prepend an item to a list.
  - head     Return the first element of a list
  - rest     Return all but the first element of a list
  - if       Test a condition and evaluate and return the second argument

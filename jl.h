@@ -26,7 +26,7 @@ typedef struct JLValue {
       JLFunction special;
       char *str;
       float number;
-   };
+   } value;
    struct JLValue *next;
    JLValueType tag;
 } JLValue;
