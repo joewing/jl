@@ -501,8 +501,9 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
    if(value == NULL) {
       return NULL;
    } else if(value->tag == JLVALUE_LIST &&
-      value->value.lst &&
-      value->value.lst->tag == JLVALUE_STRING) {
+             value->value.lst &&
+             value->value.lst->tag == JLVALUE_STRING) {
+
       JLValue *temp = Lookup(context, value->value.lst->value.str);
       if(temp) {
          switch(temp->tag) {
@@ -518,7 +519,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
          }
       } else {
          int i;
-         result = value;
+         result = NULL;
          for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
             if(!strcmp(INTERNAL_FUNCTIONS[i].name,
                        value->value.lst->value.str)) {
@@ -530,12 +531,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       }
 
    } else if(value->tag == JLVALUE_STRING) {
-      JLValue *temp = Lookup(context, value->value.str);
-      if(temp) {
-         result = temp;
-      } else {
-         result = value;
-      }
+      result = Lookup(context, value->value.str);
    } else {
       result = value;
    }
@@ -597,7 +593,11 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       return NULL;
    }
 
-   result = JLEvaluate(context, code);
+   result = NULL;
+   while(code) {
+      result = JLEvaluate(context, code);
+      code = code->next;
+   }
 
    LeaveScope(context);
 
