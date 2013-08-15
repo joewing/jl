@@ -84,3 +84,12 @@ Find nth Fibonacci number:
    (fib 10)
 </pre></code>
 
+The map function:
+<code><pre>
+   (define map (lambda (f lst)
+      (if lst
+         (cons (f (head lst)) (map f (rest lst)))
+         (list))))
+   (map (lambda (x) (+ x 1)) (list 1 2 3 4))
+</pre></code>
+

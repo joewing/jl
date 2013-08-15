@@ -312,11 +312,23 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
    JLValue *vp = args->next;
    if(vp) {
       JLValue *cond = JLEvaluate(context, vp);
-      if(cond && (cond->tag != JLVALUE_NUMBER || cond->value.number != 0.0)) {
-         /* true */
+      char is_true = 0;
+      if(cond) {
+         switch(cond->tag) {
+         case JLVALUE_NUMBER:
+            is_true = cond->value.number != 0.0;
+            break;
+         case JLVALUE_LIST:
+            is_true = cond->value.lst != NULL;
+            break;
+         default:
+            is_true = 1;
+            break;
+         }
+      }
+      if(is_true) {
          return JLEvaluate(context, vp->next);
       } else if(vp->next) {
-         /* false */
          return JLEvaluate(context, vp->next->next);
       }
    }
@@ -365,11 +377,15 @@ JLValue *ListFunc(JLContext *context, JLValue *args)
 JLValue *RestFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST && vp->value.lst) {
+   if(vp && vp->tag == JLVALUE_LIST) {
       JLValue *result = (JLValue*)malloc(sizeof(JLValue));
       result->tag = JLVALUE_LIST;
       result->next = NULL;
-      result->value.lst = vp->value.lst->next;
+      if(vp->value.lst) {
+         result->value.lst = vp->value.lst->next;
+      } else {
+         result->value.lst = NULL;
+      }
       return result;
    } else {
       return NULL;
