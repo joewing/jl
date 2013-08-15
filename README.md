@@ -66,20 +66,20 @@ Return the factorial of a number:
 </pre></code>
 
 Find the nth item of a list:
-<code>
+<code><pre>
    (define nth (lambda (n lst)
       (if (= n 1)
          (head lst)
          (nth (- n 1) (rest lst)))))
    (nth 2 (list 1 2 3))
-</code>
+</pre></code>
 
 Find nth Fibonacci number:
-<code>
+<code><pre>
    (define fib (lambda (n)
       (if (> n 1)
          (+ (fib (- n 1)) (fib (- n 2)))
          1)))
    (fib 10)
-</code>
+</pre></code>
 
