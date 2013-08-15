@@ -1,7 +1,7 @@
 
 JL
 ==============================================================================
-This is a simple embeddable LISP-like language.  The intended use is for
+This is a small, embeddable LISP-like language.  The intended use is for
 configuration files where it is desirable to be able to have complex
 configurations (JWM, for example).
 
@@ -55,15 +55,15 @@ The following built-in functions are available:
 Examples
 ------------------------------------------------------------------------------
 Here are some example programs.
-Return the factorial of a number:
 
-<code>
+Return the factorial of a number:
+<code><pre>
    (define fact (lambda (n)
       (if n
          (\* (fact (- n 1)) n)
          1)))
    (fact 5)
-</code>
+</pre></code>
 
 Find the nth item of a list:
 <code>
