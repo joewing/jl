@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+/** Maximum number of evaluations to allow outstanding. */
+#define MAX_EVAL_LEVELS    1024
+
 typedef struct InternalFunctionNode {
    const char *name;
    JLFunction function;
@@ -28,6 +31,7 @@ typedef struct ScopeNode {
 typedef struct JLContext {
    ScopeNode *scope;
    int line;
+   int levels;
 } JLContext;
 
 static JLValue *CreateValue(JLContext *context,
@@ -289,14 +293,13 @@ JLValue *LetFunc(JLContext *context, JLValue *args)
       vp->tag != JLVALUE_LIST ||
       vp->value.lst->tag != JLVALUE_STRING ||
       !vp->value.lst->next) {
-      return args;
+      return NULL;
    }
    name = vp->value.lst;
    value = JLEvaluate(context, vp->value.lst->next);
 
    EnterScope(context);
    JLDefineValue(context, name->value.str, value);
-   JLRelease(value); /* Retained in JLDefineValue */
    result = value;
    for(vp = vp->next; vp; vp = vp->next) {
       JLRelease(result);
@@ -418,6 +421,7 @@ JLContext *JLCreateContext()
    JLContext *context = (JLContext*)malloc(sizeof(JLContext));
    context->scope = NULL;
    context->line = 1;
+   context->levels = 0;
    EnterScope(context);
    return context;
 }
@@ -480,8 +484,12 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
 {
    JLValue *result = NULL;
 
+   context->levels += 1;
    if(value == NULL) {
-      return NULL;
+      result = NULL;
+   } else if(context->levels > MAX_EVAL_LEVELS) {
+      ParseError(context, "maximum evaluation depth exceeded");
+      result = NULL;
    } else if(value->tag == JLVALUE_LIST &&
              value->value.lst &&
              value->value.lst->tag == JLVALUE_STRING) {
@@ -524,6 +532,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       result = value;
       JLRetain(result);
    }
+   context->levels -= 1;
    return result;
 }
 

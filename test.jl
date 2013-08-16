@@ -44,5 +44,7 @@
 
 (define reverse (lambda (lst) (foldl (lambda (a b) (cons b a)) (list) lst)))
 
+(assert (= (let (bah (lambda (x) (+ x 1))) (bah 10)) 11))
+
 (print "\ndone\n")
 
