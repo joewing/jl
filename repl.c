@@ -27,6 +27,7 @@ JLValue *PrintFunc(struct JLContext *context, JLValue *arglist)
 int main()
 {
    char *line = NULL;
+   const char *to_parse;
    struct JLContext *context;
    JLValue *value;
    size_t cap = 0;
@@ -40,10 +41,16 @@ int main()
       if(len <= 0) {
          break;
       }
-      printf("=> ");
-      value = JLParse(context, line);
-      JLPrint(context, JLEvaluate(context, value));
-      printf("\n");
+      to_parse = line;
+      while(*to_parse) {
+         value = JLParse(context, &to_parse);
+         if(value == NULL) {
+            break;
+         }
+         printf("=> ");
+         JLPrint(context, JLEvaluate(context, value));
+         printf("\n");
+      }
    }
    if(line) {
       free(line);

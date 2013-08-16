@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 typedef struct InternalFunctionNode {
    const char *name;
@@ -39,10 +40,8 @@ static JLValue *Lookup(JLContext *context, const char *name);
 static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
-static JLValue *Parse(JLContext *context, const char **line);
-static void ParseError(JLContext *context, const char *msg);
-static char IsSymbol(char ch);
-static char IsSpace(char ch);
+static JLValue *ParseLiteral(const char **line);
+static void ParseError(JLContext *context, const char *msg, ...);
 
 static JLValue *EqFunc(JLContext *context, JLValue *value);
 static JLValue *NeFunc(JLContext *context, JLValue *value);
@@ -547,17 +546,16 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       }
 
    } else if(value->tag == JLVALUE_STRING) {
-      result = Lookup(context, value->value.str);
+      JLValue *temp = Lookup(context, value->value.str);
+      if(temp) {
+         result = temp;
+      } else {
+         result = value;
+      }
    } else {
       result = value;
    }
    return result;
-}
-
-JLValue *JLParse(JLContext *context, const char *line)
-{
-   const char **temp = &line;
-   return Parse(context, temp);
 }
 
 JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
@@ -621,139 +619,233 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
 
 }
 
-JLValue *Parse(JLContext *context, const char **line)
+JLValue *ParseLiteral(const char **line)
 {
 
-   JLValue *result;
-   JLValue **item;
-   const char *start;
-   char *temp;
+   /* Separators include '(', ')', and white-space.
+    * If if token starts with '"', we treat it as a string with escape
+    * characters like in C.
+    * Otherwise, if a token can be parsed as a number, we treat it as such.
+    * Everything else we treat as a string.
+    * Note that function lookups happen later, here we only generate
+    * strings and floating-point numbers.
+    */
 
-   result = (JLValue*)malloc(sizeof(JLValue));
-   result->tag = JLVALUE_LIST;
+   JLValue *result = (JLValue*)malloc(sizeof(JLValue));
+   result->tag = JLVALUE_INVALID;
+   result->count = 1;
    result->next = NULL;
-   result->value.lst = NULL;
-   item = &result->value.lst;
 
-   if(**line == 0) {
-      return result;
-   }
-   if(**line != '(') {
-      ParseError(context, "expected '('");
-      return result;
-   }
-   *line += 1;
-
-   for(;;) {
-
-      /* Skip white space. */
-      while(IsSpace(**line)) {
-         if(**line == '\n') {
-            context->line += 1;
+   if(**line == '\"') {
+      size_t max_len = 16;
+      size_t len = 0;
+      char in_control = 0;
+      char in_hex = 0;
+      char in_octal = 0;
+      result->value.str = (char*)malloc(max_len);
+      *line += 1;
+      while(**line && (in_control != 0 || **line != '\"')) {
+         if(len + 1 >= max_len) {
+            max_len += 16;
+            result->value.str = (char*)realloc(result->value.str, max_len);
          }
+         if(in_hex) {
+            /* In a hex control sequence. */
+            if(**line >= '0' && **line <= '9') {
+               result->value.str[len] *= 16;
+               result->value.str[len] += **line - '0';
+               in_hex -= 1;
+               *line += 1;
+            } else if(**line >= 'a' && **line <= 'f') {
+               result->value.str[len] *= 16;
+               result->value.str[len] += **line - 'a' + 10;
+               in_hex -= 1;
+               *line += 1;
+            } else if(**line >= 'A' && **line <= 'F') {
+               result->value.str[len] *= 16;
+               result->value.str[len] += **line - 'A' + 10;
+               in_hex -= 1;
+               *line += 1;
+            } else {
+               /* Premature end of hex sequence; reparse this character. */
+               in_hex = 0;
+            }
+         } else if(in_octal) {
+            /* In an octal control sequence. */
+            if(**line >= '0' && **line <= '7') {
+               result->value.str[len] *= 8;
+               result->value.str[len] += **line - '0';
+               in_octal -= 1;
+               *line += 1;
+            } else {
+               /* Premature end of octal sequence; reparse this character. */
+               in_octal = 0;
+            }
+         } else if(in_control) {
+            /* In a control sequence. */
+            in_control = 0;
+            switch(**line) {
+            case 'a':   /* bell */
+               result->value.str[len++] = '\a';
+               break;
+            case 'b':   /* backspace */
+               result->value.str[len++] = '\b';
+               break;
+            case 'f':   /* form-feed */
+               result->value.str[len++] = '\f';
+               break;
+            case 'n':   /* new-line */
+               result->value.str[len++] = '\n';
+               break;
+            case 'r':   /* carriage return */
+               result->value.str[len++] = '\r';
+               break;
+            case 't':   /* tab */
+               result->value.str[len++] = '\t';
+               break;
+            case 'v':   /* vertical tab */
+               result->value.str[len++] = '\v';
+               break;
+            case 'x':   /* Hex control sequence. */
+               in_hex = 2;
+               break;
+            case '0':   /* Octal control sequence. */
+               in_octal = 3;
+               break;
+            default:    /* Literal character */
+               result->value.str[len++] = **line;
+               break;
+            }
+            *line += 1;
+         } else if(**line == '\\') {
+            /* Start of a control sequence. */
+            in_control = 1;
+            *line += 1;
+         } else {
+            /* Regular character. */
+            result->value.str[len] = **line;
+            len += 1;
+            *line += 1;
+         }
+      }
+      result->value.str[len] = 0;
+      result->tag = JLVALUE_STRING;
+      if(**line) {
+         /* Skip the terminating '"'. */
+         *line += 1;
+      }
+   } else {
+
+      const char *start = *line;
+      char *end;
+      size_t len = 0;
+
+      /* Determine how long this token is. */
+      while(**line != 0 && **line != '(' && **line != ')' &&
+            **line != ' ' && **line != '\t' && **line != '\r' &&
+            **line != '\n') {
+         len += 1;
          *line += 1;
       }
 
-      /* Exit if we hit the end. */
-      if(**line == 0) {
-         ParseError(context, "expected ')'");
-      }
-      if(**line == ')') {
-         return result;
-      }
-      switch(**line) {
-      case '(':
-         *item = Parse(context, line);
-         if(*item) {
-            item = &(*item)->next;
-         }
-         if(**line != ')') {
-            ParseError(context, "expected ')'");
-            return result;
-         } else {
-            *line += 1;
-         }
-         break;
-      case '\"':
-         break;
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-         *item = (JLValue*)malloc(sizeof(JLValue));
-         (*item)->tag = JLVALUE_NUMBER;
-         (*item)->value.number = strtof(*line, &temp);
-         *line = temp;
-         item = &(*item)->next;
-         break;
-      default:
-         start = *line;
-         temp = NULL;
-         while(IsSymbol(**line)) {
-            if(**line == '\n') {
-               context->line += 1;
-            }
-            *line += 1;
-         }
-         if(*line - start > 0) {
-            temp = malloc(*line - start + 1);
-            memcpy(temp, start, *line - start);
-            temp[*line - start + 1] = 0;
-         }
-         *item = (JLValue*)malloc(sizeof(JLValue));
-         (*item)->tag = JLVALUE_STRING;
-         (*item)->value.str = temp;
-         item = &(*item)->next;
-      }
-   }
+      /* Attempt to parse the token as a float. */
+      result->value.number = strtof(start, &end);
 
-   if(**line != ')') {
-      ParseError(context, "expected ')'");
-      return result;
+      /* If we couldn't parse the whole thing, treat it as a string. */
+      if(start + len != end) {
+         result->tag = JLVALUE_STRING;
+         result->value.str = (char*)malloc(len + 1);
+         memcpy(result->value.str, start, len);
+         result->value.str[len] = 0;
+      } else {
+         result->tag = JLVALUE_NUMBER;
+      }
+
    }
 
    return result;
 
 }
 
-void ParseError(JLContext *context, const char *msg)
+JLValue *JLParse(JLContext *context, const char **line)
 {
-   printf("ERROR[%d]: %s\n", context->line, msg);
+
+   JLValue *result;
+   JLValue **item;
+
+   /* Skip any leading white-space. */
+   for(;;) {
+      if(**line == '\n') {
+         context->line += 1;
+      } else if(  **line != '\t' &&
+                  **line != ' ' &&
+                  **line != '\r') {
+         break;
+      }
+      *line += 1;
+   }
+
+   if(**line == 0) {
+      return NULL;
+   }
+   if(**line != '(') {
+      ParseError(context, "expected '('");
+      return NULL;
+   }
+   *line += 1;
+
+   result = (JLValue*)malloc(sizeof(JLValue));
+   result->tag = JLVALUE_LIST;
+   result->next = NULL;
+   result->value.lst = NULL;
+   result->count = 0;
+   item = &result->value.lst;
+
+   for(;;) {
+
+      /* Process the next token. */
+      switch(**line) {
+      case '\n':
+         context->line += 1;
+         /* Fall through */
+      case ' ':
+      case '\t':
+      case '\r':
+         *line += 1;
+         break;
+      case 0:
+         ParseError(context, "expected ')', got end-of-input");
+         DestroyValue(result);
+         return NULL;
+      case ')':
+         *line += 1;
+         return result;
+      case '(':
+         *item = JLParse(context, line);
+         if(*item) {
+            item = &(*item)->next;
+         } else {
+            DestroyValue(result);
+            return NULL;
+         }
+         break;
+      default:
+         *item = ParseLiteral(line);
+         item = &(*item)->next;
+         break;
+      }
+   }
+
 }
 
-char IsSymbol(char ch)
+void ParseError(JLContext *context, const char *msg, ...)
 {
-   switch(ch) {
-   case '\t':
-   case '\n':
-   case '\r':
-   case '(':
-   case ')':
-   case ' ':
-   case 0:
-      return 0;
-   default:
-      return 1;
-   }
-}
-
-char IsSpace(char ch)
-{
-   switch(ch) {
-   case ' ':
-   case '\t':
-   case '\r':
-   case '\n':
-      return 1;
-   default:
-      return 0;
-   }
+   va_list ap;
+   va_start(ap, msg);
+   printf("ERROR[%d]: ", context->line);
+   vprintf(msg, ap);
+   printf("\n");
+   va_end(ap);
 }
 
 void JLPrint(const JLContext *context, const JLValue *value)
