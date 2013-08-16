@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-O2 -Wall -Werror -g
+CFLAGS=-O0 -Wall -Werror -g
 LDFLAGS=-g
 
 all: *.c *.h

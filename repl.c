@@ -11,28 +11,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-JLValue *PrintFunc(struct JLContext *context, JLValue *arglist)
+static JLValue *PrintFunc(struct JLContext *context, JLValue *arglist)
 {
    JLValue *vp = arglist->next;
-   JLValue *result = arglist;
+   JLValue *result = NULL;
    for(; vp; vp = vp->next) {
+      JLRelease(result);
       result = JLEvaluate(context, vp);
-      JLPrint(context, result);
-      printf("\n");
+      if(result && result->tag == JLVALUE_STRING) {
+         printf("%s", result->value.str);
+      } else if(result && result->tag == JLVALUE_NUMBER) {
+         printf("%g", result->value.number);
+      } else {
+         JLPrint(context, result);
+      }
+   }
+   return result;
+}
+
+static JLValue *ProcessBuffer(struct JLContext *context, const char *line)
+{
+   JLValue *result = NULL;
+   while(*line) {
+      JLValue *value = JLParse(context, &line);
+      if(value) {
+         JLRelease(result);
+         result = JLEvaluate(context, value);
+         JLRelease(value);
+      }
    }
    return result;
 }
 
 int main(int argc, char *argv[])
 {
-   char *line = NULL;
-   const char *to_parse;
-   struct JLContext *context;
-   JLValue *value;
    JLValue *result;
+   char *line = NULL;
+   struct JLContext *context;
    size_t cap = 0;
    char *filename = NULL;
-   FILE *fd;
 
    if(argc == 2) {
       filename = argv[1];
@@ -45,42 +62,46 @@ int main(int argc, char *argv[])
    JLDefineSpecial(context, "print", PrintFunc);
 
    if(filename) {
-      fd = fopen(filename, "r");
+      FILE *fd = fopen(filename, "r");
+      size_t len = 0;
+      size_t max_len = 16;
       if(!fd) {
          printf("ERROR: file \"%s\" not found\n", filename);
          return -1;
       }
-   } else {
-      fd = stdin;
-   }
-
-   while(!feof(fd)) {
-      if(!filename) {
-         printf("> "); fflush(stdout);
-      }
-      ssize_t len = getline(&line, &cap, fd);
-      if(len <= 0) {
-         break;
-      }
-      to_parse = line;
-      while(*to_parse) {
-         value = JLParse(context, &to_parse);
-         if(value == NULL) {
+      line = (char*)malloc(max_len);
+      for(;;) {
+         const int ch = fgetc(fd);
+         if(ch == EOF) {
+            line[len] = 0;
             break;
          }
-         result = JLEvaluate(context, value);
-         if(!filename) {
-            printf("=> ");
-            JLPrint(context, result);
-            printf("\n");
+         if(len >= max_len) {
+            max_len *= 2;
+            line = (char*)realloc(line, max_len);
          }
+         line[len] = (char)ch;
+         len += 1;
+      }
+      fclose(fd);
+      result = ProcessBuffer(context, line);
+      JLRelease(result);
+   } else {
+      for(;;) {
+         printf("> "); fflush(stdout);
+         const ssize_t len = getline(&line, &cap, stdin);
+         if(len <= 0) {
+            break;
+         }
+         result = ProcessBuffer(context, line);
+         printf("=> ");
+         JLPrint(context, result);
+         printf("\n");
+         JLRelease(result);
       }
    }
    if(line) {
       free(line);
-   }
-   if(filename) {
-      fclose(fd);
    }
    JLDestroyContext(context);
 

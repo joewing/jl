@@ -55,6 +55,15 @@ struct JLContext *JLCreateContext();
  */
 void JLDestroyContext(struct JLContext *context);
 
+/** Increase the reference count of a value. */
+#define JLRetain( v ) do { if(v) (v)->count += 1; } while(0)
+
+/** Decrease the reference count of a value.
+ * This will destroy the value if the reference count reaches zero.
+ * It is safe to pass NULL to this function.
+ */
+void JLRelease(JLValue *value);
+
 /** Define a value.
  * This will add a binding to the current scope.
  * @param context The context in which to define the value.
@@ -72,18 +81,17 @@ void JLDefineValue(struct JLContext *context,
  * @param context The context in which to define the function.
  * @param name The name of the function.
  * @param func The function code.
- * @return The function value.  This must be retained if used.
  */
-JLValue *JLDefineSpecial(struct JLContext *context,
-                         const char *name,
-                         JLFunction func);
+void JLDefineSpecial(struct JLContext *context,
+                     const char *name,
+                     JLFunction func);
 
 /** Define a number.
  * This will add a number to the current scope.
  * @param context The context in which to define the number.
  * @param name The name of the binding.
  * @param value The value to define.
- * @return The value.  This must be retained if used.
+ * @return The value.  This value must be released if not used.
  */
 JLValue *JLDefineNumber(struct JLContext *context,
                         const char *name,
@@ -93,11 +101,14 @@ JLValue *JLDefineNumber(struct JLContext *context,
  * Note that only a single expression is parsed.
  * @param context The context.
  * @param line The expression to be parsed.
- * @return The expression.  This value is retained and must be destroyed.
+ * @return The expression.  This value must be released if not used.
  */
 JLValue *JLParse(struct JLContext *context, const char **line);
 
 /** Evaluate an expression.
+ * @param context The context.
+ * @param value The expression to evaluate.
+ * @return The result.  This value must be released if not used.
  */
 JLValue *JLEvaluate(struct JLContext *context, JLValue *value);
 

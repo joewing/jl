@@ -69,7 +69,7 @@ Return the factorial of a number:
 Find the nth item of a list:
 <code><pre>
    (define nth (lambda (n lst)
-      (if (= n 1)
+      (if (<= n 1)
          (head lst)
          (nth (- n 1) (rest lst)))))
    (nth 2 (list 1 2 3))
