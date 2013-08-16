@@ -93,3 +93,18 @@ The map function:
    (map (lambda (x) (+ x 1)) (list 1 2 3 4))
 </pre></code>
 
+The foldl function:
+<code><pre>
+   (define foldl (lambda (f i lst)
+      (if lst
+         (foldl f (f i (head lst)) (rest lst))
+         i)))
+   (foldl (lambda (a b) (+ a b)) 0 (list 1 2 3 4))
+</pre></code>
+
+The reverse function implemented in terms of foldl:
+<code><pre>
+   (define reverse (lambda (lst) (foldl (lambda (a b) (cons b a)) (list) lst)))
+   (reverse (list 1 2 3 4))
+</pre></code>
+
