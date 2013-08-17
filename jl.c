@@ -807,6 +807,7 @@ JLValue *JLParse(JLContext *context, const char **line)
    }
    if(**line != '(') {
       ParseError(context, "expected '('");
+      *line += 1;
       return NULL;
    }
    *line += 1;
