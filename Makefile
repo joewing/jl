@@ -3,8 +3,8 @@ CC=gcc
 CFLAGS=-O2 -Wall -Werror -g
 LDFLAGS=-g
 
-JLOBJS=jl.o
-REPLOBJS=repl.o $(JLOBJS)
+JLOBJS=src/jl.o
+REPLOBJS=src/repl.o $(JLOBJS)
 
 all: repl
 
@@ -15,5 +15,5 @@ repl: $(REPLOBJS)
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 
 clean:
-	rm -f repl *.o
+	rm -f repl src/*.o
 

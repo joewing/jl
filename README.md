@@ -5,8 +5,10 @@ This is a small, embeddable LISP-like language.  The intended use is for
 configuration files where it is desirable to be able to have complex
 configurations (JWM, for example).
 
-This is still a work in progress.  Errors are not handled in a graceful
-manner and there is no garbage collection yet.
+This is still a work in progress: there are still more functions to
+be implemented, errors are not yet handled in a graceful manner,
+and more comprehensive testing is needed.  However, simple programs
+seem to work.
 
 Syntax
 ------------------------------------------------------------------------------
