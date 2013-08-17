@@ -10,7 +10,7 @@
 #include <stdarg.h>
 
 /** Maximum number of evaluations to allow outstanding. */
-#define MAX_EVAL_LEVELS    1024
+#define MAX_EVAL_LEVELS    (1 << 15)
 
 typedef struct InternalFunctionNode {
    const char *name;
@@ -31,6 +31,7 @@ typedef struct ScopeNode {
 
 typedef struct JLContext {
    ScopeNode *scope;
+   JLValue *freelist;
    int line;
    int levels;
 } JLContext;
@@ -39,15 +40,17 @@ static JLValue *CreateValue(JLContext *context,
                             const char *name,
                             JLValueType tag);
 static JLValue *CopyValue(JLContext *context, const JLValue *other);
-static void ReleaseScope(ScopeNode *scope);
+static void ReleaseScope(JLContext *context, ScopeNode *scope);
 static void EnterScope(JLContext *context);
 static void LeaveScope(JLContext *context);
 static JLValue *Lookup(JLContext *context, const char *name);
 static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
-static JLValue *ParseLiteral(const char **line);
+static JLValue *ParseLiteral(JLContext *context, const char **line);
 static void ParseError(JLContext *context, const char *msg, ...);
+static JLValue *GetValue(JLContext *context);
+static void PutValue(JLContext *context, JLValue *value);
 
 static JLValue *CompareFunc(JLContext *context, JLValue *value);
 static JLValue *AddFunc(JLContext *context, JLValue *value);
@@ -121,9 +124,9 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
             break;
          }
       }
-      JLRelease(vb);
+      JLRelease(context, vb);
    }
-   JLRelease(va);
+   JLRelease(context, va);
    return result;
 }
 
@@ -136,7 +139,7 @@ JLValue *AddFunc(JLContext *context, JLValue *args)
       if(arg && arg->tag == JLVALUE_NUMBER) {
          result->value.number += arg->value.number;
       }
-      JLRelease(arg);
+      JLRelease(context, arg);
    }
    return result;
 }
@@ -151,13 +154,13 @@ JLValue *SubFunc(JLContext *context, JLValue *args)
       if(arg && arg->tag == JLVALUE_NUMBER) {
          result->value.number = arg->value.number;
       }
-      JLRelease(arg);
+      JLRelease(context, arg);
       for(vp = vp->next; vp; vp = vp->next) {
          arg = JLEvaluate(context, vp);
          if(arg && arg->tag == JLVALUE_NUMBER) {
             result->value.number -= arg->value.number;
          }
-         JLRelease(arg);
+         JLRelease(context, arg);
       }
    }
    return result;
@@ -172,7 +175,7 @@ JLValue *MulFunc(JLContext *context, JLValue *args)
       if(arg) {
          result->value.number *= arg->value.number;
       }
-      JLRelease(arg);
+      JLRelease(context, arg);
    }
    return result;
 }
@@ -187,13 +190,13 @@ JLValue *DivFunc(JLContext *context, JLValue *args)
       if(arg && arg->tag == JLVALUE_NUMBER) {
          result->value.number = arg->value.number;
       }
-      JLRelease(arg);
+      JLRelease(context, arg);
       for(vp = vp->next; vp; vp = vp->next) {
          arg = JLEvaluate(context, vp);
          if(arg) {
             result->value.number /= arg->value.number;
          }
-         JLRelease(arg);
+         JLRelease(context, arg);
       }
    }
    return result;
@@ -210,8 +213,8 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
          head->next = rest->value.lst;
          JLRetain(rest->value.lst);
       }
-      JLRelease(rest);
-      JLRelease(value);
+      JLRelease(context, rest);
+      JLRelease(context, value);
       result->value.lst = head;
       return result;
    }
@@ -237,7 +240,7 @@ JLValue *HeadFunc(JLContext *context, JLValue *args)
       result = vp->value.lst;
       JLRetain(result);
    }
-   JLRelease(vp);
+   JLRelease(context, vp);
    return result;
 }
 
@@ -259,7 +262,7 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
             is_true = 1;
             break;
          }
-         JLRelease(cond);
+         JLRelease(context, cond);
       }
       if(is_true) {
          return JLEvaluate(context, vp->next);
@@ -301,7 +304,7 @@ JLValue *LetFunc(JLContext *context, JLValue *args)
    JLDefineValue(context, name->value.str, value);
    result = value;
    for(vp = vp->next; vp; vp = vp->next) {
-      JLRelease(result);
+      JLRelease(context, result);
       result = JLEvaluate(context, vp);
    }
    LeaveScope(context);
@@ -334,15 +337,33 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
          result->value.lst = NULL;
       }
    }
-   JLRelease(vp);
+   JLRelease(context, vp);
    return result;
+}
+
+JLValue *GetValue(JLContext *context)
+{
+   JLValue *result;
+   if(context->freelist) {
+      result = context->freelist;
+      context->freelist = result->next;
+   } else {
+      result = (JLValue*)malloc(sizeof(JLValue));
+   }
+   return result;
+}
+
+void PutValue(JLContext *context, JLValue *value)
+{
+   value->next = context->freelist;
+   context->freelist = value;
 }
 
 JLValue *CreateValue(JLContext *context,
                      const char *name,
                      JLValueType tag)
 {
-   JLValue *result = (JLValue*)malloc(sizeof(JLValue));
+   JLValue *result = GetValue(context);
    result->tag = tag;
    result->next = NULL;
    result->count = 1;
@@ -369,14 +390,14 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
    return result;
 }
 
-void ReleaseScope(ScopeNode *scope)
+void ReleaseScope(JLContext *context, ScopeNode *scope)
 {
    scope->count -= 1;
    if(scope->count == 0) {
       while(scope->bindings) {
          BindingNode *next = scope->bindings->next;
          free(scope->bindings->name);
-         JLRelease(scope->bindings->value);
+         JLRelease(context, scope->bindings->value);
          free(scope->bindings);
          scope->bindings = next;
       }
@@ -384,7 +405,7 @@ void ReleaseScope(ScopeNode *scope)
    }
 }
 
-void JLRelease(JLValue *value)
+void JLRelease(JLContext *context, JLValue *value)
 {
    while(value) {
       value->count -= 1;
@@ -393,18 +414,18 @@ void JLRelease(JLValue *value)
          switch(value->tag) {
          case JLVALUE_LIST:
          case JLVALUE_LAMBDA:
-            JLRelease(value->value.lst);
+            JLRelease(context, value->value.lst);
             break;
          case JLVALUE_STRING:
             free(value->value.str);
             break;
          case JLVALUE_SCOPE:
-            ReleaseScope((ScopeNode*)value->value.scope);
+            ReleaseScope(context, (ScopeNode*)value->value.scope);
             break;
          default:
             break;
          }
-         free(value);
+         PutValue(context, value);
          value = next;
       } else {
          break;
@@ -425,13 +446,14 @@ void LeaveScope(JLContext *context)
 {
    ScopeNode *scope = context->scope;
    context->scope = scope->next;
-   ReleaseScope(scope);
+   ReleaseScope(context, scope);
 }
 
 JLContext *JLCreateContext()
 {
    JLContext *context = (JLContext*)malloc(sizeof(JLContext));
    context->scope = NULL;
+   context->freelist = NULL;
    context->line = 1;
    context->levels = 0;
    EnterScope(context);
@@ -442,6 +464,11 @@ void JLDestroyContext(JLContext *context)
 {
    while(context->scope) {
       LeaveScope(context);
+   }
+   while(context->freelist) {
+      JLValue *next = context->freelist->next;
+      free(context->freelist);
+      context->freelist = next;
    }
    free(context);
 }
@@ -459,7 +486,7 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
       while(binding) {
          if(!strcmp(binding->name, name)) {
             /* Overwrite the binding. */
-            JLRelease(binding->value);
+            JLRelease(context, binding->value);
             binding->value = value;
             return;
          }
@@ -482,7 +509,7 @@ void JLDefineSpecial(JLContext *context,
 {
    JLValue *result = CreateValue(context, name, JLVALUE_SPECIAL);
    result->value.special = func;
-   JLRelease(result);
+   JLRelease(context, result);
 }
 
 JLValue *JLDefineNumber(JLContext *context,
@@ -618,7 +645,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       result = JLEvaluate(context, ap);
       context->scope = new_scope;
       JLDefineValue(context, bp->value.str, result);
-      JLRelease(result);
+      JLRelease(context, result);
       bp = bp->next;
       ap = ap->next;
    }
@@ -633,7 +660,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       result = JLEvaluate(context, code);
       code = code->next;
       if(code) {
-         JLRelease(result);
+         JLRelease(context, result);
       }
    }
 
@@ -646,7 +673,7 @@ done_eval_lambda:
 
 }
 
-JLValue *ParseLiteral(const char **line)
+JLValue *ParseLiteral(JLContext *context, const char **line)
 {
 
    /* Separators include '(', ')', and white-space.
@@ -658,7 +685,7 @@ JLValue *ParseLiteral(const char **line)
     * strings and floating-point numbers.
     */
 
-   JLValue *result = CreateValue(NULL, NULL, JLVALUE_INVALID);
+   JLValue *result = CreateValue(context, NULL, JLVALUE_INVALID);
 
    if(**line == '\"') {
       size_t max_len = 16;
@@ -846,7 +873,7 @@ JLValue *JLParse(JLContext *context, const char **line)
          break;
       case 0:
          ParseError(context, "expected ')', got end-of-input");
-         JLRelease(result);
+         JLRelease(context, result);
          return NULL;
       case ')':
          *line += 1;
@@ -856,12 +883,12 @@ JLValue *JLParse(JLContext *context, const char **line)
          if(*item) {
             item = &(*item)->next;
          } else {
-            JLRelease(result);
+            JLRelease(context, result);
             return NULL;
          }
          break;
       default:
-         *item = ParseLiteral(line);
+         *item = ParseLiteral(context, line);
          item = &(*item)->next;
          break;
       }

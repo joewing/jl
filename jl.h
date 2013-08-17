@@ -62,9 +62,10 @@ void JLDestroyContext(struct JLContext *context);
 
 /** Decrease the reference count of a value.
  * This will destroy the value if the reference count reaches zero.
- * It is safe to pass NULL to this function.
+ * @param context The context.
+ * @param value The value to be released (can be NULL).
  */
-void JLRelease(JLValue *value);
+void JLRelease(struct JLContext *context, JLValue *value);
 
 /** Define a value.
  * This will add a binding to the current scope.

@@ -16,7 +16,7 @@ static JLValue *PrintFunc(struct JLContext *context, JLValue *arglist)
    JLValue *vp = arglist->next;
    JLValue *result = NULL;
    for(; vp; vp = vp->next) {
-      JLRelease(result);
+      JLRelease(context, result);
       result = JLEvaluate(context, vp);
       if(result && result->tag == JLVALUE_STRING) {
          printf("%s", result->value.str);
@@ -35,9 +35,9 @@ static JLValue *ProcessBuffer(struct JLContext *context, const char *line)
    while(*line) {
       JLValue *value = JLParse(context, &line);
       if(value) {
-         JLRelease(result);
+         JLRelease(context, result);
          result = JLEvaluate(context, value);
-         JLRelease(value);
+         JLRelease(context, value);
       }
    }
    return result;
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
       }
       fclose(fd);
       result = ProcessBuffer(context, line);
-      JLRelease(result);
+      JLRelease(context, result);
    } else {
       for(;;) {
          printf("> "); fflush(stdout);
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
          printf("=> ");
          JLPrint(context, result);
          printf("\n");
-         JLRelease(result);
+         JLRelease(context, result);
       }
    }
    if(line) {
