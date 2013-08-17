@@ -1,11 +1,19 @@
 
 CC=gcc
-CFLAGS=-O0 -Wall -Werror -g
+CFLAGS=-O2 -Wall -Werror -g
 LDFLAGS=-g
 
-all: *.c *.h
-	$(CC) $(CFLAGS) $(LDFLAGS) jl.c repl.c -o repl
+JLOBJS=jl.o
+REPLOBJS=repl.o $(JLOBJS)
+
+all: repl
+
+repl: $(REPLOBJS)
+	$(CC) $(LDFLAGS) $(REPLOBJS) -o repl
+
+.c.o: $*.c *.h
+	$(CC) $(CFLAGS) -c $*.c -o $*.o
 
 clean:
-	rm -f repl
+	rm -f repl *.o
 

@@ -462,9 +462,7 @@ JLContext *JLCreateContext()
 
 void JLDestroyContext(JLContext *context)
 {
-   while(context->scope) {
-      LeaveScope(context);
-   }
+   LeaveScope(context);
    while(context->freelist) {
       JLValue *next = context->freelist->next;
       free(context->freelist);
