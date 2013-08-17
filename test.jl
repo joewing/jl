@@ -46,5 +46,10 @@
 
 (assert (= (let (bah (lambda (x) (+ x 1))) (bah 10)) 11))
 
+(let (x 1)
+   (let (f (lambda (y) (+ x y)))
+      (let (x 2)
+         (assert (= (f 3) 4)))))
+
 (print "\ndone\n")
 
