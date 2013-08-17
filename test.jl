@@ -51,5 +51,9 @@
       (let (x 2)
          (assert (= (f 3) 4)))))
 
+(define x 1)
+(define x 2)
+(assert (= x 2))
+
 (print "\ndone\n")
 

@@ -220,18 +220,11 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
 
 JLValue *DefineFunc(JLContext *context, JLValue *args)
 {
-   ScopeNode *scope;
    JLValue *vp = args->next;
    JLValue *result = NULL;
-   for(scope = context->scope; scope->next; scope = scope->next);
    if(vp && vp->tag == JLVALUE_STRING) {
-      BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
       result = JLEvaluate(context, vp->next);
-      JLRetain(result);
-      binding->next = scope->bindings;
-      scope->bindings = binding;
-      binding->value = result;
-      binding->name = strdup(vp->value.str);
+      JLDefineValue(context, vp->value.str, result);
    }
    return result;
 }
@@ -456,12 +449,30 @@ void JLDestroyContext(JLContext *context)
 void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 {
    if(name) {
-      BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
+
+      BindingNode *binding;
+
+      JLRetain(value);
+
+      /* See if this binding already exists. */
+      binding = context->scope->bindings;
+      while(binding) {
+         if(!strcmp(binding->name, name)) {
+            /* Overwrite the binding. */
+            JLRelease(binding->value);
+            binding->value = value;
+            return;
+         }
+         binding = binding->next;
+      }
+
+      /* This is a new binding. */
+      binding = (BindingNode*)malloc(sizeof(BindingNode));
       binding->next = context->scope->bindings;
       context->scope->bindings = binding;
       binding->value = value;
       binding->name = strdup(name);
-      JLRetain(value);
+
    }
 }
 
@@ -628,7 +639,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
 
 done_eval_lambda:
 
-   ReleaseScope(new_scope);
+   LeaveScope(context);
    context->scope = old_scope;
 
    return result;
