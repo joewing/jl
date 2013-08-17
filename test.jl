@@ -51,6 +51,18 @@
       (let (x 2)
          (assert (= (f 3) 4)))))
 
+(define make-increment (lambda (i) (lambda (x) (+ x i))))
+(define add-five (make-increment 5))
+(assert (= (add-five 2) 7))
+
+(define add (lambda (x y) (+ x y)))
+(define do-define (lambda (x)
+   (define add (lambda (y) (- x y)))
+   (bah 1)))
+(assert (= (do-define 3) 2))
+(assert (= (add 1 2) 3))
+
+
 (define x 1)
 (define x 2)
 (assert (= x 2))

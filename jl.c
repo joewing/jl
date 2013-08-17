@@ -392,8 +392,19 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
 
 void ReleaseScope(JLContext *context, ScopeNode *scope)
 {
-   scope->count -= 1;
-   if(scope->count == 0) {
+   unsigned int new_count = scope->count - 1;
+   BindingNode *binding = scope->bindings;
+   while(binding) {
+      if(binding->value &&
+         binding->value->tag == JLVALUE_LAMBDA &&
+         binding->value->count == 1) {
+         if(binding->value->value.lst->value.scope == scope) {
+            new_count -= 1;
+         }
+      }
+      binding = binding->next;
+   }
+   if(new_count == 0) {
       while(scope->bindings) {
          BindingNode *next = scope->bindings->next;
          free(scope->bindings->name);
@@ -402,6 +413,8 @@ void ReleaseScope(JLContext *context, ScopeNode *scope)
          scope->bindings = next;
       }
       free(scope);
+   } else {
+      scope->count -= 1;
    }
 }
 
