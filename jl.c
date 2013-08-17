@@ -23,8 +23,14 @@ typedef struct BindingNode {
    struct BindingNode *next;
 } BindingNode;
 
+typedef struct ScopeNode {
+   BindingNode *bindings;
+   struct ScopeNode *next;
+   unsigned int count;
+} ScopeNode;
+
 typedef struct JLContext {
-   JLValue *scope;
+   ScopeNode *scope;
    int line;
    int levels;
 } JLContext;
@@ -33,6 +39,7 @@ static JLValue *CreateValue(JLContext *context,
                             const char *name,
                             JLValueType tag);
 static JLValue *CopyValue(JLContext *context, const JLValue *other);
+static void ReleaseScope(ScopeNode *scope);
 static void EnterScope(JLContext *context);
 static void LeaveScope(JLContext *context);
 static JLValue *Lookup(JLContext *context, const char *name);
@@ -213,7 +220,7 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
 
 JLValue *DefineFunc(JLContext *context, JLValue *args)
 {
-   JLValue *scope;
+   ScopeNode *scope;
    JLValue *vp = args->next;
    JLValue *result = NULL;
    for(scope = context->scope; scope->next; scope = scope->next);
@@ -221,8 +228,8 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
       BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
       result = JLEvaluate(context, vp->next);
       JLRetain(result);
-      binding->next = (BindingNode*)scope->value.bindings;
-      scope->value.bindings = binding;
+      binding->next = scope->bindings;
+      scope->bindings = binding;
       binding->value = result;
       binding->name = strdup(vp->value.str);
    }
@@ -273,7 +280,11 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
 JLValue *LambdaFunc(JLContext *context, JLValue *value)
 {
    JLValue *result = CreateValue(context, NULL, JLVALUE_LAMBDA);
-   result->value.lst = value->next;
+   JLValue *scope = CreateValue(context, NULL, JLVALUE_SCOPE);
+   scope->value.scope = context->scope;
+   context->scope->count += 1;
+   result->value.lst = scope;
+   result->value.lst->next = value->next;
    JLRetain(value->next);
    return result;
 }
@@ -365,9 +376,23 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
    return result;
 }
 
+void ReleaseScope(ScopeNode *scope)
+{
+   scope->count -= 1;
+   if(scope->count == 0) {
+      while(scope->bindings) {
+         BindingNode *next = scope->bindings->next;
+         free(scope->bindings->name);
+         JLRelease(scope->bindings->value);
+         free(scope->bindings);
+         scope->bindings = next;
+      }
+      free(scope);
+   }
+}
+
 void JLRelease(JLValue *value)
 {
-   BindingNode *binding;
    while(value) {
       value->count -= 1;
       if(value->count == 0) {
@@ -381,14 +406,7 @@ void JLRelease(JLValue *value)
             free(value->value.str);
             break;
          case JLVALUE_SCOPE:
-            binding = (BindingNode*)value->value.bindings;
-            while(binding) {
-               BindingNode *next = binding->next;
-               free(binding->name);
-               JLRelease(binding->value);
-               free(binding);
-               binding = next;
-            }
+            ReleaseScope((ScopeNode*)value->value.scope);
             break;
          default:
             break;
@@ -403,18 +421,18 @@ void JLRelease(JLValue *value)
 
 void EnterScope(JLContext *context)
 {
-   JLValue *scope = CreateValue(context, NULL, JLVALUE_SCOPE);
-   scope->value.bindings = NULL;
+   ScopeNode *scope = (ScopeNode*)malloc(sizeof(ScopeNode));
+   scope->count = 1;
+   scope->bindings = NULL;
    scope->next = context->scope;
-   JLRetain(context->scope);
    context->scope = scope;
 }
 
 void LeaveScope(JLContext *context)
 {
-   JLValue *scope = context->scope;
+   ScopeNode *scope = context->scope;
    context->scope = scope->next;
-   JLRelease(scope);
+   ReleaseScope(scope);
 }
 
 JLContext *JLCreateContext()
@@ -439,8 +457,8 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 {
    if(name) {
       BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
-      binding->next = (BindingNode*)context->scope->value.bindings;
-      context->scope->value.bindings = binding;
+      binding->next = context->scope->bindings;
+      context->scope->bindings = binding;
       binding->value = value;
       binding->name = strdup(name);
       JLRetain(value);
@@ -467,9 +485,9 @@ JLValue *JLDefineNumber(JLContext *context,
 
 JLValue *Lookup(JLContext *context, const char *name)
 {
-   const JLValue *scope = context->scope;
+   const ScopeNode *scope = context->scope;
    while(scope) {
-      const BindingNode *binding = (const BindingNode*)scope->value.bindings;
+      const BindingNode *binding = scope->bindings;
       while(binding) {
          if(!strcmp(binding->name, name)) {
             return binding->value;
@@ -484,7 +502,6 @@ JLValue *Lookup(JLContext *context, const char *name)
 JLValue *JLEvaluate(JLContext *context, JLValue *value)
 {
    JLValue *result = NULL;
-
    context->levels += 1;
    if(value == NULL) {
       result = NULL;
@@ -540,43 +557,55 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
 JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
 {
 
+   JLValue *scope;
    JLValue *params;
    JLValue *code;
+   ScopeNode *old_scope;
+   ScopeNode *new_scope;
    JLValue *bp;
    JLValue *ap;
    JLValue *result;
 
-   /* The value of a lambda is a list.  The first element of the
-    * list is a set of positional argument bindings.  The remaining
-    * elements repesent the code to execute with these bindings in place.
+   /* The value of a lambda is a list containing the following:
+    *    - The scope in which to execute.
+    *    - A list of positional argument bindings.
+    *    - The code to execute (all remaining list items).
     * args should be a list of arguments that is the same length as
     * the number of parameters to the lambda. */
 
    /* Make sure the lambda is well-defined. */
    if(lambda->value.lst == NULL ||
-      lambda->value.lst->tag != JLVALUE_LIST) {
+      lambda->value.lst->tag != JLVALUE_SCOPE ||
+      lambda->value.lst->next == NULL ||
+      lambda->value.lst->next->tag != JLVALUE_LIST) {
       ParseError(context, "invalid lambda");
       return NULL;
    }
-   params = lambda->value.lst->value.lst;
-   code = lambda->value.lst->next;
+   scope = lambda->value.lst;
+   params = lambda->value.lst->next->value.lst;
+   code = lambda->value.lst->next->next;
 
    /* Insert bindings. */
+   old_scope = context->scope;
+   context->scope = (ScopeNode*)scope->value.scope;
    EnterScope(context);
+   new_scope = context->scope;
    bp = params;
    ap = args->next;  /* Skip the name */
    while(bp) {
       if(ap == NULL) {
          ParseError(context, "too few arguments");
-         LeaveScope(context);
-         return NULL;
+         result = NULL;
+         goto done_eval_lambda;
       }
       if(bp->tag != JLVALUE_STRING) {
          ParseError(context, "invalid lambda argument");
-         LeaveScope(context);
-         return NULL;
+         result = NULL;
+         goto done_eval_lambda;
       }
+      context->scope = old_scope;
       result = JLEvaluate(context, ap);
+      context->scope = new_scope;
       JLDefineValue(context, bp->value.str, result);
       JLRelease(result);
       bp = bp->next;
@@ -584,8 +613,8 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
    }
    if(ap) {
       ParseError(context, "too many arguments");
-      LeaveScope(context);
-      return NULL;
+      result = NULL;
+      goto done_eval_lambda;
    }
 
    result = NULL;
@@ -597,7 +626,10 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       }
    }
 
-   LeaveScope(context);
+done_eval_lambda:
+
+   ReleaseScope(new_scope);
+   context->scope = old_scope;
 
    return result;
 
@@ -861,7 +893,7 @@ void JLPrint(const JLContext *context, const JLValue *value)
       break;
    case JLVALUE_LAMBDA:
       printf("(lambda ");
-      for(temp = value->value.lst; temp; temp = temp->next) {
+      for(temp = value->value.lst->next; temp; temp = temp->next) {
          JLPrint(context, temp);
          if(temp->next) {
             printf(" ");
@@ -870,7 +902,7 @@ void JLPrint(const JLContext *context, const JLValue *value)
       printf(")");
       break;
    case JLVALUE_SPECIAL:
-      printf("@%p", value->value.special);
+      printf("special@%p", value->value.special);
       break;
    default:
       printf("\n?\n");

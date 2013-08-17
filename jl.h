@@ -40,7 +40,7 @@ typedef struct JLValue {
       JLFunction special;
       char *str;
       float number;
-      void *bindings;
+      void *scope;
    } value;
    struct JLValue *next;
    unsigned int count;
