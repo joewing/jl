@@ -23,13 +23,8 @@ typedef struct BindingNode {
    struct BindingNode *next;
 } BindingNode;
 
-typedef struct ScopeNode {
-   BindingNode *bindings;
-   struct ScopeNode *next;
-} ScopeNode;
-
 typedef struct JLContext {
-   ScopeNode *scope;
+   JLValue *scope;
    int line;
    int levels;
 } JLContext;
@@ -218,7 +213,7 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
 
 JLValue *DefineFunc(JLContext *context, JLValue *args)
 {
-   ScopeNode *scope;
+   JLValue *scope;
    JLValue *vp = args->next;
    JLValue *result = NULL;
    for(scope = context->scope; scope->next; scope = scope->next);
@@ -226,8 +221,8 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
       BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
       result = JLEvaluate(context, vp->next);
       JLRetain(result);
-      binding->next = scope->bindings;
-      scope->bindings = binding;
+      binding->next = (BindingNode*)scope->value.bindings;
+      scope->value.bindings = binding;
       binding->value = result;
       binding->name = strdup(vp->value.str);
    }
@@ -358,6 +353,7 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
    switch(result->tag) {
    case JLVALUE_LIST:
    case JLVALUE_LAMBDA:
+   case JLVALUE_SCOPE:
       JLRetain(result->value.lst);
       break;
    case JLVALUE_STRING:
@@ -371,6 +367,7 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
 
 void JLRelease(JLValue *value)
 {
+   BindingNode *binding;
    while(value) {
       value->count -= 1;
       if(value->count == 0) {
@@ -382,6 +379,16 @@ void JLRelease(JLValue *value)
             break;
          case JLVALUE_STRING:
             free(value->value.str);
+            break;
+         case JLVALUE_SCOPE:
+            binding = (BindingNode*)value->value.bindings;
+            while(binding) {
+               BindingNode *next = binding->next;
+               free(binding->name);
+               JLRelease(binding->value);
+               free(binding);
+               binding = next;
+            }
             break;
          default:
             break;
@@ -396,24 +403,18 @@ void JLRelease(JLValue *value)
 
 void EnterScope(JLContext *context)
 {
-   ScopeNode *scope = (ScopeNode*)malloc(sizeof(ScopeNode));
-   scope->bindings = NULL;
+   JLValue *scope = CreateValue(context, NULL, JLVALUE_SCOPE);
+   scope->value.bindings = NULL;
    scope->next = context->scope;
+   JLRetain(context->scope);
    context->scope = scope;
 }
 
 void LeaveScope(JLContext *context)
 {
-   ScopeNode *next_scope = context->scope->next;
-   while(context->scope->bindings) {
-      BindingNode *next = context->scope->bindings->next;
-      free(context->scope->bindings->name);
-      JLRelease(context->scope->bindings->value);
-      free(context->scope->bindings);
-      context->scope->bindings = next;
-   }
-   free(context->scope);
-   context->scope = next_scope;
+   JLValue *scope = context->scope;
+   context->scope = scope->next;
+   JLRelease(scope);
 }
 
 JLContext *JLCreateContext()
@@ -438,8 +439,8 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 {
    if(name) {
       BindingNode *binding = (BindingNode*)malloc(sizeof(BindingNode));
-      binding->next = context->scope->bindings;
-      context->scope->bindings = binding;
+      binding->next = (BindingNode*)context->scope->value.bindings;
+      context->scope->value.bindings = binding;
       binding->value = value;
       binding->name = strdup(name);
       JLRetain(value);
@@ -466,9 +467,9 @@ JLValue *JLDefineNumber(JLContext *context,
 
 JLValue *Lookup(JLContext *context, const char *name)
 {
-   ScopeNode *scope = context->scope;
+   const JLValue *scope = context->scope;
    while(scope) {
-      BindingNode *binding = scope->bindings;
+      const BindingNode *binding = (const BindingNode*)scope->value.bindings;
       while(binding) {
          if(!strcmp(binding->name, name)) {
             return binding->value;

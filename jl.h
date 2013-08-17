@@ -29,6 +29,7 @@ typedef char JLValueType;
 #define JLVALUE_LIST       3     /**< Linked list. */
 #define JLVALUE_LAMBDA     4     /**< Lambda function. */
 #define JLVALUE_SPECIAL    5     /**< Special form. */
+#define JLVALUE_SCOPE      6     /**< A scope (internal use). */
 
 /** Values in the JL environment.
  * Note that these are reference counted.
@@ -39,6 +40,7 @@ typedef struct JLValue {
       JLFunction special;
       char *str;
       float number;
+      void *bindings;
    } value;
    struct JLValue *next;
    unsigned int count;
