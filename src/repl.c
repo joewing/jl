@@ -11,22 +11,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static JLValue *PrintFunc(struct JLContext *context, JLValue *arglist)
+static JLValue *PrintFunc(struct JLContext *context, JLValue *args)
 {
-   JLValue *vp = arglist->next;
-   JLValue *result = NULL;
-   for(; vp; vp = vp->next) {
-      JLRelease(context, result);
-      result = JLEvaluate(context, vp);
+   JLValue *vp;
+   for(vp = args->next; vp; vp = vp->next) {
+      JLValue *result = JLEvaluate(context, vp);
       if(result && result->tag == JLVALUE_STRING) {
          printf("%s", result->value.str);
-      } else if(result && result->tag == JLVALUE_NUMBER) {
-         printf("%g", result->value.number);
       } else {
          JLPrint(context, result);
       }
+      JLRelease(context, result);
    }
-   return result;
+   return NULL;
 }
 
 static JLValue *ProcessBuffer(struct JLContext *context, const char *line)

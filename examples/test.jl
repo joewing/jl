@@ -44,13 +44,6 @@
 
 (define reverse (lambda (lst) (foldl (lambda (a b) (cons b a)) (list) lst)))
 
-(assert (= (let (bah (lambda (x) (+ x 1))) (bah 10)) 11))
-
-(let (x 1)
-   (let (f (lambda (y) (+ x y)))
-      (let (x 2)
-         (assert (= (f 3) 4)))))
-
 (define make-increment (lambda (i) (lambda (x) (+ x i))))
 (define add-five (make-increment 5))
 (assert (= (add-five 2) 7))

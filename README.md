@@ -45,19 +45,22 @@ The following built-in functions are available:
  - -        Subtract
  - *        Return the produce of a list
  - /        Divide
+ - %        Modulus
+ - and      Logical AND.
+ - or       Logical OR.
  - list     Create a list
  - cons     Prepend an item to a list.
  - head     Return the first element of a list
  - rest     Return all but the first element of a list
  - if       Test a condition and evaluate and return the second argument
             if true, otherwise evaluate and return the third argument.
- - define   Insert a binding into the global namespace.
- - let      Insert a local binding.
+ - define   Insert a binding into the current namespace.
  - lambda   Declare a function.
+ - begin    Execute a sequence of functions, return the value of the last.
 
 Examples
 ------------------------------------------------------------------------------
-Here are some example programs.
+Here are some example programs.  See the "examples" directory for more.
 
 Return the factorial of a number:
 <code><pre>
@@ -109,4 +112,8 @@ The reverse function implemented in terms of foldl:
    (define reverse (lambda (lst) (foldl (lambda (a b) (cons b a)) (list) lst)))
    (reverse (list 1 2 3 4))
 </pre></code>
+
+License
+------------------------------------------------------------------------------
+JL uses the BSD 2-clause license.  See LICENSE for more information.
 

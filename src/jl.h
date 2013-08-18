@@ -39,7 +39,7 @@ typedef struct JLValue {
       struct JLValue *lst;
       JLFunction special;
       char *str;
-      float number;
+      double number;
       void *scope;
    } value;
    struct JLValue *next;
@@ -98,7 +98,7 @@ void JLDefineSpecial(struct JLContext *context,
  */
 JLValue *JLDefineNumber(struct JLContext *context,
                         const char *name,
-                        float value);
+                        double value);
 
 /** Parse an expression.
  * Note that only a single expression is parsed.
