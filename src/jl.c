@@ -20,7 +20,8 @@ typedef struct InternalFunctionNode {
 typedef struct BindingNode {
    char *name;
    JLValue *value;
-   struct BindingNode *next;
+   struct BindingNode *left;
+   struct BindingNode *right;
 } BindingNode;
 
 typedef struct ScopeNode {
@@ -49,6 +50,8 @@ static JLValue *CreateValue(JLContext *context,
                             const char *name,
                             JLValueType tag);
 static JLValue *CopyValue(JLContext *context, const JLValue *other);
+static unsigned int CountScopeBindings(BindingNode *binding, ScopeNode *scope);
+static void ReleaseBindings(JLContext *context, BindingNode *binding);
 static void ReleaseScope(JLContext *context, ScopeNode *scope);
 static void EnterScope(JLContext *context);
 static void LeaveScope(JLContext *context);
@@ -449,28 +452,40 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
    return result;
 }
 
-void ReleaseScope(JLContext *context, ScopeNode *scope)
+unsigned int CountScopeBindings(BindingNode *binding, ScopeNode *scope)
 {
-   unsigned int new_count = scope->count - 1;
-   BindingNode *binding = scope->bindings;
-   while(binding) {
+   unsigned int count = 0;
+   if(binding) {
+      count += CountScopeBindings(binding->left, scope);
+      count += CountScopeBindings(binding->right, scope);
       if(binding->value &&
          binding->value->tag == JLVALUE_LAMBDA &&
          binding->value->count == 1) {
          if(binding->value->value.lst->value.scope == scope) {
-            new_count -= 1;
+            count += 1;
          }
       }
-      binding = binding->next;
    }
+   return count;
+}
+
+void ReleaseBindings(JLContext *context, BindingNode *binding)
+{
+   if(binding) {
+      ReleaseBindings(context, binding->left);
+      ReleaseBindings(context, binding->right);
+      free(binding->name);
+      JLRelease(context, binding->value);
+      PutValue(context, binding);
+   }
+}
+
+void ReleaseScope(JLContext *context, ScopeNode *scope)
+{
+   const unsigned int new_count = scope->count - 1
+                                - CountScopeBindings(scope->bindings, scope);
    if(new_count == 0) {
-      while(scope->bindings) {
-         BindingNode *next = scope->bindings->next;
-         free(scope->bindings->name);
-         JLRelease(context, scope->bindings->value);
-         PutValue(context, scope->bindings);
-         scope->bindings = next;
-      }
+      ReleaseBindings(context, scope->bindings);
       PutValue(context, scope);
    } else {
       scope->count -= 1;
@@ -524,11 +539,16 @@ void LeaveScope(JLContext *context)
 JLContext *JLCreateContext()
 {
    JLContext *context = (JLContext*)malloc(sizeof(JLContext));
+   size_t i;
    context->scope = NULL;
    context->freelist = NULL;
    context->line = 1;
    context->levels = 0;
    EnterScope(context);
+   for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
+      JLDefineSpecial(context, INTERNAL_FUNCTIONS[i].name,
+                      INTERNAL_FUNCTIONS[i].function);
+   }
    return context;
 }
 
@@ -546,29 +566,28 @@ void JLDestroyContext(JLContext *context)
 void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 {
    if(name) {
-
-      BindingNode *binding;
-
+      BindingNode **root = &context->scope->bindings;
       JLRetain(value);
-
-      /* See if this binding already exists. */
-      binding = context->scope->bindings;
-      while(binding) {
-         if(!strcmp(binding->name, name)) {
-            /* Overwrite the binding. */
-            JLRelease(context, binding->value);
-            binding->value = value;
+      while(*root) {
+         const int v = strcmp((*root)->name, name);
+         if(v < 0) {
+            root = &(*root)->left;
+         } else if(v > 0) {
+            root = &(*root)->right;
+         } else {
+            /* Overwrite the old binding. */
+            JLRelease(context, (*root)->value);
+            (*root)->value = value;
             return;
          }
-         binding = binding->next;
       }
 
-      /* This is a new binding. */
-      binding = &GetValue(context)->binding;
-      binding->next = context->scope->bindings;
-      context->scope->bindings = binding;
-      binding->value = value;
-      binding->name = strdup(name);
+      /* New binding. */
+      *root = &GetValue(context)->binding;
+      (*root)->name = strdup(name);
+      (*root)->value = value;
+      (*root)->left = NULL;
+      (*root)->right = NULL;
 
    }
 }
@@ -597,10 +616,14 @@ JLValue *Lookup(JLContext *context, const char *name)
    while(scope) {
       const BindingNode *binding = scope->bindings;
       while(binding) {
-         if(!strcmp(binding->name, name)) {
+         const int v = strcmp(binding->name, name);
+         if(v < 0) {
+            binding = binding->left;
+         } else if(v > 0) {
+            binding = binding->right;
+         } else {
             return binding->value;
          }
-         binding = binding->next;
       }
       scope = scope->next;
    }
@@ -619,7 +642,6 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
    } else if(value->tag == JLVALUE_LIST &&
              value->value.lst &&
              value->value.lst->tag == JLVALUE_STRING) {
-
       JLValue *temp = Lookup(context, value->value.lst->value.str);
       if(temp) {
          switch(temp->tag) {
@@ -633,19 +655,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
             result = JLEvaluate(context, temp);
             break;
          }
-      } else {
-         int i;
-         result = NULL;
-         for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
-            if(!strcmp(INTERNAL_FUNCTIONS[i].name,
-                       value->value.lst->value.str)) {
-               result = (INTERNAL_FUNCTIONS[i].function)(context,
-                                                         value->value.lst);
-               break;
-            }
-         }
       }
-
    } else if(value->tag == JLVALUE_STRING) {
       JLValue *temp = Lookup(context, value->value.str);
       if(temp) {
