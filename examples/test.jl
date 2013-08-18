@@ -69,5 +69,8 @@
    (assert (= y 2)))
 (assert (= y 1))
 
+(assert (= 0 (and 0 (assert 0))))
+(assert (= 1 (or 1)))
+
 (print "\ndone\n")
 

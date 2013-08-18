@@ -29,9 +29,18 @@ typedef struct ScopeNode {
    unsigned int count;
 } ScopeNode;
 
+typedef struct FreeNode {
+   union {
+      BindingNode        binding;
+      ScopeNode          scope;
+      JLValue            value;
+      struct FreeNode   *next;
+   };
+} FreeNode;
+
 typedef struct JLContext {
    ScopeNode *scope;
-   JLValue *freelist;
+   FreeNode *freelist;
    int line;
    int levels;
 } JLContext;
@@ -49,7 +58,7 @@ static JLValue *EvalLambda(JLContext *context,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
 static void ParseError(JLContext *context, const char *msg, ...);
-static JLValue *GetValue(JLContext *context);
+static FreeNode *GetValue(JLContext *context);
 static void PutValue(JLContext *context, void *value);
 
 static char CheckCondition(JLContext *context, JLValue *value);
@@ -390,24 +399,21 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *GetValue(JLContext *context)
+FreeNode *GetValue(JLContext *context)
 {
-   JLValue *result;
+   FreeNode *node;
    if(context->freelist) {
-      result = context->freelist;
-      context->freelist = result->next;
+      node = context->freelist;
+      context->freelist = node->next;
    } else {
-      size_t size = sizeof(JLValue);
-      size = size < sizeof(ScopeNode) ? sizeof(ScopeNode) : size;
-      size = size < sizeof(BindingNode) ? sizeof(BindingNode) : size;
-      result = (JLValue*)malloc(size);
+      node = (FreeNode*)malloc(sizeof(FreeNode));
    }
-   return result;
+   return node;
 }
 
 void PutValue(JLContext *context, void *value)
 {
-   JLValue *temp = (JLValue*)value;
+   FreeNode *temp = (FreeNode*)value;
    temp->next = context->freelist;
    context->freelist = temp;
 }
@@ -416,7 +422,7 @@ JLValue *CreateValue(JLContext *context,
                      const char *name,
                      JLValueType tag)
 {
-   JLValue *result = GetValue(context);
+   JLValue *result = &GetValue(context)->value;
    result->tag = tag;
    result->next = NULL;
    result->count = 1;
@@ -501,7 +507,7 @@ void JLRelease(JLContext *context, JLValue *value)
 
 void EnterScope(JLContext *context)
 {
-   ScopeNode *scope = (ScopeNode*)GetValue(context);
+   ScopeNode *scope = &GetValue(context)->scope;
    scope->count = 1;
    scope->bindings = NULL;
    scope->next = context->scope;
@@ -530,7 +536,7 @@ void JLDestroyContext(JLContext *context)
 {
    LeaveScope(context);
    while(context->freelist) {
-      JLValue *next = context->freelist->next;
+      FreeNode *next = context->freelist->next;
       free(context->freelist);
       context->freelist = next;
    }
@@ -558,7 +564,7 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
       }
 
       /* This is a new binding. */
-      binding = (BindingNode*)GetValue(context);
+      binding = &GetValue(context)->binding;
       binding->next = context->scope->bindings;
       context->scope->bindings = binding;
       binding->value = value;
