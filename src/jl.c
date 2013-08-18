@@ -50,7 +50,7 @@ static JLValue *EvalLambda(JLContext *context,
 static JLValue *ParseLiteral(JLContext *context, const char **line);
 static void ParseError(JLContext *context, const char *msg, ...);
 static JLValue *GetValue(JLContext *context);
-static void PutValue(JLContext *context, JLValue *value);
+static void PutValue(JLContext *context, void *value);
 
 static char CheckCondition(JLContext *context, JLValue *value);
 static JLValue *CompareFunc(JLContext *context, JLValue *value);
@@ -397,15 +397,19 @@ JLValue *GetValue(JLContext *context)
       result = context->freelist;
       context->freelist = result->next;
    } else {
-      result = (JLValue*)malloc(sizeof(JLValue));
+      size_t size = sizeof(JLValue);
+      size = size < sizeof(ScopeNode) ? sizeof(ScopeNode) : size;
+      size = size < sizeof(BindingNode) ? sizeof(BindingNode) : size;
+      result = (JLValue*)malloc(size);
    }
    return result;
 }
 
-void PutValue(JLContext *context, JLValue *value)
+void PutValue(JLContext *context, void *value)
 {
-   value->next = context->freelist;
-   context->freelist = value;
+   JLValue *temp = (JLValue*)value;
+   temp->next = context->freelist;
+   context->freelist = temp;
 }
 
 JLValue *CreateValue(JLContext *context,
@@ -458,10 +462,10 @@ void ReleaseScope(JLContext *context, ScopeNode *scope)
          BindingNode *next = scope->bindings->next;
          free(scope->bindings->name);
          JLRelease(context, scope->bindings->value);
-         free(scope->bindings);
+         PutValue(context, scope->bindings);
          scope->bindings = next;
       }
-      free(scope);
+      PutValue(context, scope);
    } else {
       scope->count -= 1;
    }
@@ -497,7 +501,7 @@ void JLRelease(JLContext *context, JLValue *value)
 
 void EnterScope(JLContext *context)
 {
-   ScopeNode *scope = (ScopeNode*)malloc(sizeof(ScopeNode));
+   ScopeNode *scope = (ScopeNode*)GetValue(context);
    scope->count = 1;
    scope->bindings = NULL;
    scope->next = context->scope;
@@ -554,7 +558,7 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
       }
 
       /* This is a new binding. */
-      binding = (BindingNode*)malloc(sizeof(BindingNode));
+      binding = (BindingNode*)GetValue(context);
       binding->next = context->scope->bindings;
       context->scope->bindings = binding;
       binding->value = value;

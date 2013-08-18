@@ -55,10 +55,19 @@
 (assert (= (do-define 3) 2))
 (assert (= (add 1 2) 3))
 
-
 (define x 1)
 (define x 2)
 (assert (= x 2))
+
+(assert (= (begin 1 2) 2))
+
+(define y 1)
+(assert (= y 1))
+(begin
+   (assert (= y 1))
+   (define y 2)
+   (assert (= y 2)))
+(assert (= y 1))
 
 (print "\ndone\n")
 
