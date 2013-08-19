@@ -81,6 +81,7 @@ static JLValue *IfFunc(JLContext *context, JLValue *value);
 static JLValue *LambdaFunc(JLContext *context, JLValue *value);
 static JLValue *ListFunc(JLContext *context, JLValue *value);
 static JLValue *RestFunc(JLContext *context, JLValue *value);
+static JLValue *CharFunc(JLContext *context, JLValue *args);
 
 static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "=",         CompareFunc },
@@ -103,7 +104,8 @@ static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "if",        IfFunc      },
    { "lambda",    LambdaFunc  },
    { "list",      ListFunc    },
-   { "rest",      RestFunc    }
+   { "rest",      RestFunc    },
+   { "char",      CharFunc    }
 };
 static size_t INTERNAL_FUNCTION_COUNT = sizeof(INTERNAL_FUNCTIONS)
                                       / sizeof(InternalFunctionNode);
@@ -399,6 +401,28 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
       }
    }
    JLRelease(context, vp);
+   return result;
+}
+
+JLValue *CharFunc(JLContext *context, JLValue *args)
+{
+   JLValue *result = NULL;
+   JLValue *str = JLEvaluate(context, args->next);
+   if(str && str->tag == JLVALUE_STRING) {
+      JLValue *index = JLEvaluate(context, args->next->next);
+      if(index && index->tag == JLVALUE_NUMBER) {
+         const size_t len = strlen(str->value.str);
+         const size_t i = (size_t)index->value.number;
+         if(i < len) {
+            result = CreateValue(context, NULL, JLVALUE_STRING);
+            result->value.str = (char*)malloc(2);
+            result->value.str[0] = str->value.str[i];
+            result->value.str[1] = 0;
+         }
+      }
+      JLRelease(context, index);
+   }
+   JLRelease(context, str);
    return result;
 }
 

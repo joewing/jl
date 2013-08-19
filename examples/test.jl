@@ -72,5 +72,11 @@
 (assert (= 0 (and 0 (assert 0))))
 (assert (= 1 (or 1)))
 
+(define strlen (lambda (str)
+   (define helper (lambda (i) (if (char str i) (helper (+ i 1)) i)))
+   (helper 0)))
+
+(assert (= (strlen "asdf") 4))
+
 (print "\ndone\n")
 
