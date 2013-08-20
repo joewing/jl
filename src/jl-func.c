@@ -36,6 +36,7 @@ static JLValue *LambdaFunc(JLContext *context, JLValue *value);
 static JLValue *ListFunc(JLContext *context, JLValue *value);
 static JLValue *RestFunc(JLContext *context, JLValue *value);
 static JLValue *CharFunc(JLContext *context, JLValue *args);
+static JLValue *ConcatFunc(JLContext *context, JLValue *args);
 
 static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "=",         CompareFunc },
@@ -59,7 +60,8 @@ static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "lambda",    LambdaFunc  },
    { "list",      ListFunc    },
    { "rest",      RestFunc    },
-   { "char",      CharFunc    }
+   { "char",      CharFunc    },
+   { "concat",    ConcatFunc  }
 };
 static size_t INTERNAL_FUNCTION_COUNT = sizeof(INTERNAL_FUNCTIONS)
                                       / sizeof(InternalFunctionNode);
@@ -377,6 +379,31 @@ JLValue *CharFunc(JLContext *context, JLValue *args)
       JLRelease(context, index);
    }
    JLRelease(context, str);
+   return result;
+}
+
+JLValue *ConcatFunc(JLContext *context, JLValue *args)
+{
+   JLValue *result = CreateValue(context, NULL, JLVALUE_STRING);
+   JLValue *vp;
+   size_t len = 0;
+   size_t max_len = 8;
+   result->value.str = (char*)malloc(max_len);
+   for(vp = args->next; vp; vp = vp->next) {
+      JLValue *arg = JLEvaluate(context, vp);
+      if(arg && arg->tag == JLVALUE_STRING) {
+         const size_t l = strlen(arg->value.str);
+         const size_t new_len = len + l;
+         if(new_len >= max_len) {
+            max_len = new_len + 1;
+            result->value.str = (char*)realloc(result->value.str, max_len);
+         }
+         memcpy(&result->value.str[len], arg->value.str, l);
+         len = new_len;
+      }
+      JLRelease(context, arg);
+   }
+   result->value.str[len] = 0;
    return result;
 }
 

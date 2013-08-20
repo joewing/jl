@@ -78,5 +78,7 @@
 
 (assert (= (strlen "asdf") 4))
 
+(print "\nbah: " (concat "this" " " "is" " " "a" " " "test") "\n")
+
 (print "\ndone\n")
 
