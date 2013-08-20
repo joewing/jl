@@ -11,13 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static JLValue *PrintFunc(struct JLContext *context, JLValue *args)
+static struct JLValue *PrintFunc(struct JLContext *context,
+                                 struct JLValue *args)
 {
-   JLValue *vp;
-   for(vp = args->next; vp; vp = vp->next) {
-      JLValue *result = JLEvaluate(context, vp);
-      if(result && result->tag == JLVALUE_STRING) {
-         printf("%s", result->value.str);
+   struct JLValue *vp;
+   for(vp = JLGetNext(args); vp; vp = JLGetNext(vp)) {
+      struct JLValue *result = JLEvaluate(context, vp);
+      if(JLIsString(result)) {
+         printf("%s", JLGetString(result));
       } else {
          JLPrint(context, result);
       }
@@ -26,11 +27,12 @@ static JLValue *PrintFunc(struct JLContext *context, JLValue *args)
    return NULL;
 }
 
-static JLValue *ProcessBuffer(struct JLContext *context, const char *line)
+static struct JLValue *ProcessBuffer(struct JLContext *context,
+                                     const char *line)
 {
-   JLValue *result = NULL;
+   struct JLValue *result = NULL;
    while(*line) {
-      JLValue *value = JLParse(context, &line);
+      struct JLValue *value = JLParse(context, &line);
       if(value) {
          JLRelease(context, result);
          result = JLEvaluate(context, value);
@@ -42,9 +44,9 @@ static JLValue *ProcessBuffer(struct JLContext *context, const char *line)
 
 int main(int argc, char *argv[])
 {
-   JLValue *result;
-   char *line = NULL;
    struct JLContext *context;
+   struct JLValue *result;
+   char *line = NULL;
    size_t cap = 0;
    char *filename = NULL;
 

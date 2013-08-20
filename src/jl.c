@@ -4,6 +4,10 @@
  */
 
 #include "jl.h"
+#include "jl-context.h"
+#include "jl-value.h"
+#include "jl-scope.h"
+#include "jl-func.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,507 +16,16 @@
 /** Maximum number of evaluations to allow outstanding. */
 #define MAX_EVAL_LEVELS    (1 << 15)
 
-typedef struct InternalFunctionNode {
-   const char *name;
-   JLFunction function;
-} InternalFunctionNode;
-
-typedef struct BindingNode {
-   char *name;
-   JLValue *value;
-   struct BindingNode *left;
-   struct BindingNode *right;
-} BindingNode;
-
-typedef struct ScopeNode {
-   BindingNode *bindings;
-   struct ScopeNode *next;
-   unsigned int count;
-} ScopeNode;
-
-typedef struct FreeNode {
-   union {
-      BindingNode        binding;
-      ScopeNode          scope;
-      JLValue            value;
-      struct FreeNode   *next;
-   };
-} FreeNode;
-
-typedef struct JLContext {
-   ScopeNode *scope;
-   FreeNode *freelist;
-   int line;
-   int levels;
-} JLContext;
-
-static JLValue *CreateValue(JLContext *context,
-                            const char *name,
-                            JLValueType tag);
-static JLValue *CopyValue(JLContext *context, const JLValue *other);
-static unsigned int CountScopeBindings(BindingNode *binding, ScopeNode *scope);
-static void ReleaseBindings(JLContext *context, BindingNode *binding);
-static void ReleaseScope(JLContext *context, ScopeNode *scope);
-static void EnterScope(JLContext *context);
-static void LeaveScope(JLContext *context);
-static JLValue *Lookup(JLContext *context, const char *name);
 static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
 static void ParseError(JLContext *context, const char *msg, ...);
-static FreeNode *GetValue(JLContext *context);
-static void PutValue(JLContext *context, void *value);
 
-static char CheckCondition(JLContext *context, JLValue *value);
-static JLValue *CompareFunc(JLContext *context, JLValue *value);
-static JLValue *AddFunc(JLContext *context, JLValue *value);
-static JLValue *SubFunc(JLContext *context, JLValue *value);
-static JLValue *MulFunc(JLContext *context, JLValue *value);
-static JLValue *DivFunc(JLContext *context, JLValue *value);
-static JLValue *ModFunc(JLContext *context, JLValue *value);
-static JLValue *AndFunc(JLContext *context, JLValue *value);
-static JLValue *OrFunc(JLContext *context, JLValue *value);
-static JLValue *BeginFunc(JLContext *context, JLValue *value);
-static JLValue *ConsFunc(JLContext *context, JLValue *value);
-static JLValue *DefineFunc(JLContext *context, JLValue *value);
-static JLValue *HeadFunc(JLContext *context, JLValue *value);
-static JLValue *IfFunc(JLContext *context, JLValue *value);
-static JLValue *LambdaFunc(JLContext *context, JLValue *value);
-static JLValue *ListFunc(JLContext *context, JLValue *value);
-static JLValue *RestFunc(JLContext *context, JLValue *value);
-static JLValue *CharFunc(JLContext *context, JLValue *args);
-
-static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
-   { "=",         CompareFunc },
-   { "!=",        CompareFunc },
-   { ">",         CompareFunc },
-   { ">=",        CompareFunc },
-   { "<",         CompareFunc },
-   { "<=",        CompareFunc },
-   { "+",         AddFunc     },
-   { "-",         SubFunc     },
-   { "*",         MulFunc     },
-   { "/",         DivFunc     },
-   { "mod",       ModFunc     },
-   { "and",       AndFunc     },
-   { "or",        OrFunc      },
-   { "begin",     BeginFunc   },
-   { "cons",      ConsFunc    },
-   { "define",    DefineFunc  },
-   { "head",      HeadFunc    },
-   { "if",        IfFunc      },
-   { "lambda",    LambdaFunc  },
-   { "list",      ListFunc    },
-   { "rest",      RestFunc    },
-   { "char",      CharFunc    }
-};
-static size_t INTERNAL_FUNCTION_COUNT = sizeof(INTERNAL_FUNCTIONS)
-                                      / sizeof(InternalFunctionNode);
-
-char CheckCondition(JLContext *context, JLValue *value)
+void JLRetain(JLValue *value)
 {
-   JLValue *cond = JLEvaluate(context, value);
-   char rc = 0;
-   if(cond) {
-      switch(cond->tag) {
-      case JLVALUE_NUMBER:
-         rc = cond->value.number != 0.0;
-         break;
-      case JLVALUE_LIST:
-         rc = cond->value.lst != NULL;
-         break;
-      default:
-         rc = 1;
-         break;
-      }
-      JLRelease(context, cond);
-   }
-   return rc;
-}
-
-JLValue *CompareFunc(JLContext *context, JLValue *args)
-{
-   JLValue *result = NULL;
-   JLValue *va = JLEvaluate(context, args->next);
-   if(va && va->tag == JLVALUE_NUMBER) {
-      JLValue *vb = JLEvaluate(context, args->next->next);
-      if(vb && vb->tag == JLVALUE_NUMBER) {
-         const double a = va->value.number;
-         const double b = vb->value.number;
-         result = JLDefineNumber(context, NULL, 0.0);
-         switch(args->value.str[0]) {
-         case '=':
-            result->value.number = a == b;
-            break;
-         case '!':
-            result->value.number = a != b;
-            break;
-         case '<':
-            if(args->value.str[1] == '=') {
-               result->value.number = a <= b;
-            } else {
-               result->value.number = a < b;
-            }
-            break;
-         case '>':
-            if(args->value.str[1] == '=') {
-               result->value.number = a >= b;
-            } else {
-               result->value.number = a > b;
-            }
-            break;
-         default:
-            break;
-         }
-      }
-      JLRelease(context, vb);
-   }
-   JLRelease(context, va);
-   return result;
-}
-
-JLValue *AddFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   for(vp = args->next; vp; vp = vp->next) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number += arg->value.number;
-      }
-      JLRelease(context, arg);
-   }
-   return result;
-}
-
-JLValue *SubFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
-      JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg && arg->tag == JLVALUE_NUMBER) {
-            result->value.number -= arg->value.number;
-         }
-         JLRelease(context, arg);
-      }
-   }
-   return result;
-}
-
-JLValue *MulFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 1.0);
-   for(vp = args->next; vp; vp = vp->next) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg) {
-         result->value.number *= arg->value.number;
-      }
-      JLRelease(context, arg);
-   }
-   return result;
-}
-
-JLValue *DivFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
-      JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg) {
-            result->value.number /= arg->value.number;
-         }
-         JLRelease(context, arg);
-      }
-   }
-   return result;
-}
-
-JLValue *ModFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
-      JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg) {
-            const long d = (long)arg->value.number;
-            if(d) {
-               result->value.number = (long)result->value.number % d;
-            } else {
-               result->value.number = 0.0;
-            }
-         }
-         JLRelease(context, arg);
-      }
-   }
-   return result;
-}
-
-JLValue *AndFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 1.0);
-   for(vp = args->next; vp; vp = vp->next) {
-      if(!CheckCondition(context, vp)) {
-         result->value.number = 0.0;
-         break;
-      }
-   }
-   return result;
-}
-
-JLValue *OrFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   for(vp = args->next; vp; vp = vp->next) {
-      if(CheckCondition(context, vp)) {
-         result->value.number = 1.0;
-         break;
-      }
-   }
-   return result;
-}
-
-JLValue *BeginFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp;
-   JLValue *result = NULL;
-   EnterScope(context);
-   for(vp = args->next; vp; vp = vp->next) {
-      JLRelease(context, result);
-      result = JLEvaluate(context, vp);
-   }
-   LeaveScope(context);
-   return result;
-}
-
-JLValue *ConsFunc(JLContext *context, JLValue *args)
-{
-   JLValue *value = JLEvaluate(context, args->next);
    if(value) {
-      JLValue *head = CopyValue(context, value);
-      JLValue *result = CreateValue(context, NULL, JLVALUE_LIST);
-      JLValue *rest = JLEvaluate(context, args->next->next);
-      if(rest && rest->tag == JLVALUE_LIST) {
-         head->next = rest->value.lst;
-         JLRetain(rest->value.lst);
-      }
-      JLRelease(context, rest);
-      JLRelease(context, value);
-      result->value.lst = head;
-      return result;
-   }
-   return NULL;
-}
-
-JLValue *DefineFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp = args->next;
-   JLValue *result = NULL;
-   if(vp && vp->tag == JLVALUE_STRING) {
-      result = JLEvaluate(context, vp->next);
-      JLDefineValue(context, vp->value.str, result);
-   }
-   return result;
-}
-
-JLValue *HeadFunc(JLContext *context, JLValue *args)
-{
-   JLValue *result = NULL;
-   JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST) {
-      result = vp->value.lst;
-      JLRetain(result);
-   }
-   JLRelease(context, vp);
-   return result;
-}
-
-JLValue *IfFunc(JLContext *context, JLValue *args)
-{
-   JLValue *vp = args->next;
-   if(CheckCondition(context, vp)) {
-      return JLEvaluate(context, vp->next);
-   } else if(vp->next) {
-      return JLEvaluate(context, vp->next->next);
-   }
-   return NULL;
-}
-
-JLValue *LambdaFunc(JLContext *context, JLValue *value)
-{
-   JLValue *result = CreateValue(context, NULL, JLVALUE_LAMBDA);
-   JLValue *scope = CreateValue(context, NULL, JLVALUE_SCOPE);
-   scope->value.scope = context->scope;
-   context->scope->count += 1;
-   result->value.lst = scope;
-   result->value.lst->next = value->next;
-   JLRetain(value->next);
-   return result;
-}
-
-JLValue *ListFunc(JLContext *context, JLValue *args)
-{
-   JLValue *result = CreateValue(context, NULL, JLVALUE_LIST);
-   if(args->next) {
-      result->value.lst = args->next;
-      JLRetain(args->next);
-   } else {
-      result->value.lst = NULL;
-   }
-   return result;
-}
-
-JLValue *RestFunc(JLContext *context, JLValue *args)
-{
-   JLValue *result = NULL;
-   JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST) {
-      result = CreateValue(context, NULL, JLVALUE_LIST);
-      if(vp->value.lst) {
-         result->value.lst = vp->value.lst->next;
-         JLRetain(result->value.lst);
-      } else {
-         result->value.lst = NULL;
-      }
-   }
-   JLRelease(context, vp);
-   return result;
-}
-
-JLValue *CharFunc(JLContext *context, JLValue *args)
-{
-   JLValue *result = NULL;
-   JLValue *str = JLEvaluate(context, args->next);
-   if(str && str->tag == JLVALUE_STRING) {
-      JLValue *index = JLEvaluate(context, args->next->next);
-      if(index && index->tag == JLVALUE_NUMBER) {
-         const size_t len = strlen(str->value.str);
-         const size_t i = (size_t)index->value.number;
-         if(i < len) {
-            result = CreateValue(context, NULL, JLVALUE_STRING);
-            result->value.str = (char*)malloc(2);
-            result->value.str[0] = str->value.str[i];
-            result->value.str[1] = 0;
-         }
-      }
-      JLRelease(context, index);
-   }
-   JLRelease(context, str);
-   return result;
-}
-
-FreeNode *GetValue(JLContext *context)
-{
-   FreeNode *node;
-   if(context->freelist) {
-      node = context->freelist;
-      context->freelist = node->next;
-   } else {
-      node = (FreeNode*)malloc(sizeof(FreeNode));
-   }
-   return node;
-}
-
-void PutValue(JLContext *context, void *value)
-{
-   FreeNode *temp = (FreeNode*)value;
-   temp->next = context->freelist;
-   context->freelist = temp;
-}
-
-JLValue *CreateValue(JLContext *context,
-                     const char *name,
-                     JLValueType tag)
-{
-   JLValue *result = &GetValue(context)->value;
-   result->tag = tag;
-   result->next = NULL;
-   result->count = 1;
-   JLDefineValue(context, name, result);
-   return result;
-}
-
-JLValue *CopyValue(JLContext *context, const JLValue *other)
-{
-   JLValue *result = CreateValue(context, NULL, other->tag);
-   result->value = other->value;
-   switch(result->tag) {
-   case JLVALUE_LIST:
-   case JLVALUE_LAMBDA:
-   case JLVALUE_SCOPE:
-      JLRetain(result->value.lst);
-      break;
-   case JLVALUE_STRING:
-      result->value.str = strdup(result->value.str);
-      break;
-   default:
-      break;
-   }
-   return result;
-}
-
-unsigned int CountScopeBindings(BindingNode *binding, ScopeNode *scope)
-{
-   unsigned int count = 0;
-   if(binding) {
-      count += CountScopeBindings(binding->left, scope);
-      count += CountScopeBindings(binding->right, scope);
-      if(binding->value &&
-         binding->value->tag == JLVALUE_LAMBDA &&
-         binding->value->count == 1) {
-         if(binding->value->value.lst->value.scope == scope) {
-            count += 1;
-         }
-      }
-   }
-   return count;
-}
-
-void ReleaseBindings(JLContext *context, BindingNode *binding)
-{
-   if(binding) {
-      ReleaseBindings(context, binding->left);
-      ReleaseBindings(context, binding->right);
-      free(binding->name);
-      JLRelease(context, binding->value);
-      PutValue(context, binding);
-   }
-}
-
-void ReleaseScope(JLContext *context, ScopeNode *scope)
-{
-   const unsigned int new_count = scope->count - 1
-                                - CountScopeBindings(scope->bindings, scope);
-   if(new_count == 0) {
-      ReleaseBindings(context, scope->bindings);
-      PutValue(context, scope);
-   } else {
-      scope->count -= 1;
+      value->count += 1;
    }
 }
 
@@ -536,7 +49,7 @@ void JLRelease(JLContext *context, JLValue *value)
          default:
             break;
          }
-         PutValue(context, value);
+         PutFree(context, value);
          value = next;
       } else {
          break;
@@ -544,47 +57,22 @@ void JLRelease(JLContext *context, JLValue *value)
    }
 }
 
-void EnterScope(JLContext *context)
-{
-   ScopeNode *scope = &GetValue(context)->scope;
-   scope->count = 1;
-   scope->bindings = NULL;
-   scope->next = context->scope;
-   context->scope = scope;
-}
-
-void LeaveScope(JLContext *context)
-{
-   ScopeNode *scope = context->scope;
-   context->scope = scope->next;
-   ReleaseScope(context, scope);
-}
-
 JLContext *JLCreateContext()
 {
    JLContext *context = (JLContext*)malloc(sizeof(JLContext));
-   size_t i;
    context->scope = NULL;
    context->freelist = NULL;
    context->line = 1;
    context->levels = 0;
    EnterScope(context);
-   for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
-      JLDefineSpecial(context, INTERNAL_FUNCTIONS[i].name,
-                      INTERNAL_FUNCTIONS[i].function);
-   }
+   RegisterFunctions(context);
    return context;
 }
 
 void JLDestroyContext(JLContext *context)
 {
    LeaveScope(context);
-   while(context->freelist) {
-      FreeNode *next = context->freelist->next;
-      free(context->freelist);
-      context->freelist = next;
-   }
-   free(context);
+   FreeContext(context);
 }
 
 void JLDefineValue(JLContext *context, const char *name, JLValue *value)
@@ -607,7 +95,7 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
       }
 
       /* New binding. */
-      *root = &GetValue(context)->binding;
+      *root = (BindingNode*)GetFree(context);
       (*root)->name = strdup(name);
       (*root)->value = value;
       (*root)->left = NULL;
@@ -1008,6 +496,53 @@ void ParseError(JLContext *context, const char *msg, ...)
    vprintf(msg, ap);
    printf("\n");
    va_end(ap);
+}
+
+char JLIsNumber(JLValue *value)
+{
+   if(value && value->tag == JLVALUE_NUMBER) {
+      return 1;
+   } else {
+      return 0;
+   }
+}
+
+double JLGetNumber(JLValue *value)
+{
+   return value->value.number;
+}
+
+char JLIsString(JLValue *value)
+{
+   if(value && value->tag == JLVALUE_STRING) {
+      return 1;
+   } else {
+      return 0;
+   }
+}
+
+const char *JLGetString(JLValue *value)
+{
+   return value->value.str;
+}
+
+char JLIsList(JLValue *value)
+{
+   if(value && value->tag == JLVALUE_LIST) {
+      return 1;
+   } else {
+      return 0;
+   }
+}
+
+JLValue *JLGetHead(JLValue *value)
+{
+   return value->value.lst;
+}
+
+JLValue *JLGetNext(JLValue *value)
+{
+   return value->next;
 }
 
 void JLPrint(const JLContext *context, const JLValue *value)
