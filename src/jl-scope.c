@@ -8,6 +8,7 @@
 #include "jl-value.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static unsigned int CountScopeBindings(BindingNode *binding, ScopeNode *scope);
 static void ReleaseBindings(JLContext *context, BindingNode *binding);
@@ -40,19 +41,6 @@ void ReleaseBindings(JLContext *context, BindingNode *binding)
    }
 }
 
-void ReleaseScope(JLContext *context, ScopeNode *scope)
-{
-   const unsigned int new_count = scope->count - 1
-                                - CountScopeBindings(scope->bindings, scope);
-   if(new_count == 0) {
-      ReleaseBindings(context, scope->bindings);
-      PutFree(context, scope);
-   } else {
-      scope->count -= 1;
-   }
-}
-
-
 void EnterScope(JLContext *context)
 {
    ScopeNode *scope = (ScopeNode*)GetFree(context);
@@ -69,4 +57,35 @@ void LeaveScope(JLContext *context)
    ReleaseScope(context, scope);
 }
 
+void ReleaseScope(JLContext *context, ScopeNode *scope)
+{
+   const unsigned int new_count = scope->count - 1
+                                - CountScopeBindings(scope->bindings, scope);
+   if(new_count == 0) {
+      ReleaseBindings(context, scope->bindings);
+      PutFree(context, scope);
+   } else {
+      scope->count -= 1;
+   }
+}
+
+JLValue *Lookup(JLContext *context, const char *name)
+{
+   const ScopeNode *scope = context->scope;
+   while(scope) {
+      const BindingNode *binding = scope->bindings;
+      while(binding) {
+         const int v = strcmp(binding->name, name);
+         if(v < 0) {
+            binding = binding->left;
+         } else if(v > 0) {
+            binding = binding->right;
+         } else {
+            return binding->value;
+         }
+      }
+      scope = scope->next;
+   }
+   return NULL;
+}
 

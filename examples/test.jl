@@ -17,7 +17,7 @@
 (assert (= (fact 5) 120))
 
 (define length (lambda (lst)
-   (if lst (+ 1 (length (rest lst))) 0)))
+   (if (null? lst) 0 (+ 1 (length (rest lst))))))
 
 (assert (= (length (list 1 2 3 4)) 4))
 (assert (= (length (list)) 0))
@@ -30,9 +30,7 @@
 (assert (= (nth 1 (list 5 4 3 2 1)) 5))
 
 (define map (lambda (f lst)
-   (if lst
-      (cons (f (head lst)) (map f (rest lst)))
-      (list))))
+   (if (null? lst) nil (cons (f (head lst)) (map f (rest lst))))))
 
 (define foldl (lambda (f i lst)
    (if lst (foldl f (f i (head lst)) (rest lst)) i)))
@@ -51,7 +49,7 @@
 (define add (lambda (x y) (+ x y)))
 (define do-define (lambda (x)
    (define add (lambda (y) (- x y)))
-   (bah 1)))
+   (add 1)))
 (assert (= (do-define 3) 2))
 (assert (= (add 1 2) 3))
 
@@ -71,6 +69,7 @@
 
 (assert (= 0 (and 0 (assert 0))))
 (assert (= 1 (or 1)))
+(assert (= 1 (not 0)))
 
 (define strlen (lambda (str)
    (define helper (lambda (i) (if (char str i) (helper (+ i 1)) i)))
@@ -78,7 +77,23 @@
 
 (assert (= (strlen "asdf") 4))
 
-(print "\nbah: " (concat "this" " " "is" " " "a" " " "test") "\n")
+(assert (= 1 (number? 5)))
+(assert (= 0 (number? nil)))
+(assert (= 0 (number? "test")))
+(assert (= 0 (number? (list 1 2 3))))
+(assert (= 1 (number? (head (list 1 2 3)))))
+
+(assert (= 1 (string? "asfd")))
+(assert (= 0 (string? nil)))
+(assert (= 0 (string? 5)))
+(assert (= 0 (string? (list 1 2 3))))
+(assert (= 1 (string? (head (list "asdf" 2 3)))))
+
+(assert (= 1 (list? (list 1 2))))
+(assert (= 0 (list? nil)))
+(assert (= 0 (list? 5)))
+(assert (= 0 (list? "test")))
+(assert (= 1 (list? (head (list (list 1 2) 2 3)))))
 
 (print "\ndone\n")
 

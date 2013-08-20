@@ -9,6 +9,7 @@
 #include "jl-context.h"
 #include "jl-scope.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -27,6 +28,7 @@ static JLValue *DivFunc(JLContext *context, JLValue *value);
 static JLValue *ModFunc(JLContext *context, JLValue *value);
 static JLValue *AndFunc(JLContext *context, JLValue *value);
 static JLValue *OrFunc(JLContext *context, JLValue *value);
+static JLValue *NotFunc(JLContext *context, JLValue *value);
 static JLValue *BeginFunc(JLContext *context, JLValue *value);
 static JLValue *ConsFunc(JLContext *context, JLValue *value);
 static JLValue *DefineFunc(JLContext *context, JLValue *value);
@@ -37,31 +39,40 @@ static JLValue *ListFunc(JLContext *context, JLValue *value);
 static JLValue *RestFunc(JLContext *context, JLValue *value);
 static JLValue *CharFunc(JLContext *context, JLValue *args);
 static JLValue *ConcatFunc(JLContext *context, JLValue *args);
+static JLValue *IsNumberFunc(JLContext *context, JLValue *args);
+static JLValue *IsStringFunc(JLContext *context, JLValue *args);
+static JLValue *IsListFunc(JLContext *context, JLValue *args);
+static JLValue *IsNullFunc(JLContext *context, JLValue *args);
 
 static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
-   { "=",         CompareFunc },
-   { "!=",        CompareFunc },
-   { ">",         CompareFunc },
-   { ">=",        CompareFunc },
-   { "<",         CompareFunc },
-   { "<=",        CompareFunc },
-   { "+",         AddFunc     },
-   { "-",         SubFunc     },
-   { "*",         MulFunc     },
-   { "/",         DivFunc     },
-   { "mod",       ModFunc     },
-   { "and",       AndFunc     },
-   { "or",        OrFunc      },
-   { "begin",     BeginFunc   },
-   { "cons",      ConsFunc    },
-   { "define",    DefineFunc  },
-   { "head",      HeadFunc    },
-   { "if",        IfFunc      },
-   { "lambda",    LambdaFunc  },
-   { "list",      ListFunc    },
-   { "rest",      RestFunc    },
-   { "char",      CharFunc    },
-   { "concat",    ConcatFunc  }
+   { "=",         CompareFunc    },
+   { "!=",        CompareFunc    },
+   { ">",         CompareFunc    },
+   { ">=",        CompareFunc    },
+   { "<",         CompareFunc    },
+   { "<=",        CompareFunc    },
+   { "+",         AddFunc        },
+   { "-",         SubFunc        },
+   { "*",         MulFunc        },
+   { "/",         DivFunc        },
+   { "mod",       ModFunc        },
+   { "and",       AndFunc        },
+   { "or",        OrFunc         },
+   { "not",       NotFunc        },
+   { "begin",     BeginFunc      },
+   { "cons",      ConsFunc       },
+   { "define",    DefineFunc     },
+   { "head",      HeadFunc       },
+   { "if",        IfFunc         },
+   { "lambda",    LambdaFunc     },
+   { "list",      ListFunc       },
+   { "rest",      RestFunc       },
+   { "char",      CharFunc       },
+   { "concat",    ConcatFunc     },
+   { "number?",   IsNumberFunc   },
+   { "string?",   IsStringFunc   },
+   { "list?",     IsListFunc     },
+   { "null?",     IsNullFunc     }
 };
 static size_t INTERNAL_FUNCTION_COUNT = sizeof(INTERNAL_FUNCTIONS)
                                       / sizeof(InternalFunctionNode);
@@ -253,6 +264,17 @@ JLValue *OrFunc(JLContext *context, JLValue *args)
    return result;
 }
 
+JLValue *NotFunc(JLContext *context, JLValue *args)
+{
+   JLValue *vp = JLEvaluate(context, args->next);
+   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   if(vp && vp->tag == JLVALUE_NUMBER) {
+      result->value.number = vp->value.number == 0.0 ? 1.0 : 0.0;
+   }
+   JLRelease(context, vp);
+   return result;
+}
+
 JLValue *BeginFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
@@ -289,7 +311,7 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = args->next;
    JLValue *result = NULL;
-   if(vp && vp->tag == JLVALUE_STRING) {
+   if(vp && vp->tag == JLVALUE_VARIABLE) {
       result = JLEvaluate(context, vp->next);
       JLDefineValue(context, vp->value.str, result);
    }
@@ -333,12 +355,18 @@ JLValue *LambdaFunc(JLContext *context, JLValue *value)
 
 JLValue *ListFunc(JLContext *context, JLValue *args)
 {
-   JLValue *result = CreateValue(context, NULL, JLVALUE_LIST);
+   JLValue *result = NULL;
    if(args->next) {
-      result->value.lst = args->next;
-      JLRetain(args->next);
-   } else {
-      result->value.lst = NULL;
+      result = CreateValue(context, NULL, JLVALUE_LIST);
+      JLValue **item = &result->value.lst;
+      JLValue *vp;
+      for(vp = args->next; vp; vp = vp->next) {
+         JLValue *arg = JLEvaluate(context, vp);
+         JLValue *temp = CopyValue(context, arg);
+         *item = temp;
+         item = &temp->next;
+         JLRelease(context, arg);
+      }
    }
    return result;
 }
@@ -348,12 +376,10 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
    JLValue *result = NULL;
    JLValue *vp = JLEvaluate(context, args->next);
    if(vp && vp->tag == JLVALUE_LIST) {
-      result = CreateValue(context, NULL, JLVALUE_LIST);
-      if(vp->value.lst) {
+      if(vp->value.lst && vp->value.lst->next) {
+         result = CreateValue(context, NULL, JLVALUE_LIST);
          result->value.lst = vp->value.lst->next;
          JLRetain(result->value.lst);
-      } else {
-         result->value.lst = NULL;
       }
    }
    JLRelease(context, vp);
@@ -404,6 +430,42 @@ JLValue *ConcatFunc(JLContext *context, JLValue *args)
       JLRelease(context, arg);
    }
    result->value.str[len] = 0;
+   return result;
+}
+
+JLValue *IsNumberFunc(JLContext *context, JLValue *args)
+{
+   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   result->value.number = (arg && arg->tag == JLVALUE_NUMBER) ? 1.0 : 0.0;
+   JLRelease(context, arg);
+   return result;
+}
+
+JLValue *IsStringFunc(JLContext *context, JLValue *args)
+{
+   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   result->value.number = (arg && arg->tag == JLVALUE_STRING) ? 1.0 : 0.0;
+   JLRelease(context, arg);
+   return result;
+}
+
+JLValue *IsListFunc(JLContext *context, JLValue *args)
+{
+   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   result->value.number = (arg && arg->tag == JLVALUE_LIST) ? 1.0 : 0.0;
+   JLRelease(context, arg);
+   return result;
+}
+
+JLValue *IsNullFunc(JLContext *context, JLValue *args)
+{
+   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   result->value.number = arg == NULL ? 1.0 : 0.0;
+   JLRelease(context, arg);
    return result;
 }
 

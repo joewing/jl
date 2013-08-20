@@ -17,6 +17,7 @@ typedef char JLValueType;
 #define JLVALUE_LAMBDA     4     /**< Lambda function. */
 #define JLVALUE_SPECIAL    5     /**< Special form. */
 #define JLVALUE_SCOPE      6     /**< A scope (internal use). */
+#define JLVALUE_VARIABLE   7     /**< A variable. */
 
 /** Values in the JL environment.
  * Note that these are reference counted.

@@ -66,7 +66,7 @@ void JLDefineSpecial(struct JLContext *context,
 /** Define a number.
  * This will add a number to the current scope.
  * @param context The context in which to define the number.
- * @param name The name of the binding.
+ * @param name The name of the binding (NULL for no name).
  * @param value The value to define.
  * @return The value.  This value must be released if not used.
  */

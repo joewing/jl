@@ -28,6 +28,7 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
       JLRetain(result->value.lst);
       break;
    case JLVALUE_STRING:
+   case JLVALUE_VARIABLE:
       result->value.str = strdup(result->value.str);
       break;
    default:

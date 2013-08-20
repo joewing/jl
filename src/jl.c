@@ -66,6 +66,7 @@ JLContext *JLCreateContext()
    context->levels = 0;
    EnterScope(context);
    RegisterFunctions(context);
+   JLDefineValue(context, "nil", NULL);
    return context;
 }
 
@@ -122,26 +123,6 @@ JLValue *JLDefineNumber(JLContext *context,
    return result;
 }
 
-JLValue *Lookup(JLContext *context, const char *name)
-{
-   const ScopeNode *scope = context->scope;
-   while(scope) {
-      const BindingNode *binding = scope->bindings;
-      while(binding) {
-         const int v = strcmp(binding->name, name);
-         if(v < 0) {
-            binding = binding->left;
-         } else if(v > 0) {
-            binding = binding->right;
-         } else {
-            return binding->value;
-         }
-      }
-      scope = scope->next;
-   }
-   return NULL;
-}
-
 JLValue *JLEvaluate(JLContext *context, JLValue *value)
 {
    JLValue *result = NULL;
@@ -153,7 +134,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       result = NULL;
    } else if(value->tag == JLVALUE_LIST &&
              value->value.lst &&
-             value->value.lst->tag == JLVALUE_STRING) {
+             value->value.lst->tag == JLVALUE_VARIABLE) {
       JLValue *temp = Lookup(context, value->value.lst->value.str);
       if(temp) {
          switch(temp->tag) {
@@ -168,13 +149,8 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
             break;
          }
       }
-   } else if(value->tag == JLVALUE_STRING) {
-      JLValue *temp = Lookup(context, value->value.str);
-      if(temp) {
-         result = temp;
-      } else {
-         result = value;
-      }
+   } else if(value->tag == JLVALUE_VARIABLE) {
+      result = Lookup(context, value->value.str);
       JLRetain(result);
    } else {
       result = value;
@@ -228,7 +204,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
          result = NULL;
          goto done_eval_lambda;
       }
-      if(bp->tag != JLVALUE_STRING) {
+      if(bp->tag != JLVALUE_VARIABLE) {
          ParseError(context, "invalid lambda argument");
          result = NULL;
          goto done_eval_lambda;
@@ -394,9 +370,9 @@ JLValue *ParseLiteral(JLContext *context, const char **line)
       /* Attempt to parse the token as a double. */
       result->value.number = strtod(start, &end);
 
-      /* If we couldn't parse the whole thing, treat it as a string. */
+      /* If we couldn't parse the whole thing, treat it as a variable. */
       if(start + len != end) {
-         result->tag = JLVALUE_STRING;
+         result->tag = JLVALUE_VARIABLE;
          result->value.str = (char*)malloc(len + 1);
          memcpy(result->value.str, start, len);
          result->value.str[len] = 0;

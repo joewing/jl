@@ -59,6 +59,10 @@ The following built-in functions are available:
  - begin    Execute a sequence of functions, return the value of the last.
  - char     Return a character of a string.
  - concat   Concatenate strings.
+ - number?  Determine if a value is a number.
+ - string?  Determine if a value is a string.
+ - list?    Determine if a value is a list.
+ - null?    Determine if a value is nil.
 
 Examples
 ------------------------------------------------------------------------------
