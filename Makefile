@@ -1,6 +1,6 @@
 
 CC=gcc
-CFLAGS=-O2 -Wall -Werror -g
+CFLAGS=-O2 -Wall -Werror -I. -g
 LDFLAGS=-g
 
 JLOBJS=src/jl.o src/jl-context.o src/jl-func.o src/jl-scope.o src/jl-value.o
