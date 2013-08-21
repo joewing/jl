@@ -137,10 +137,8 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
    } else if(context->levels > context->max_levels) {
       Error(context, "maximum evaluation depth exceeded");
       result = NULL;
-   } else if(value->tag == JLVALUE_LIST &&
-             value->value.lst &&
-             value->value.lst->tag == JLVALUE_VARIABLE) {
-      JLValue *temp = Lookup(context, value->value.lst->value.str);
+   } else if(value->tag == JLVALUE_LIST) {
+      JLValue *temp = JLEvaluate(context, value->value.lst);
       if(temp) {
          switch(temp->tag) {
          case JLVALUE_SPECIAL:
@@ -153,6 +151,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
             result = JLEvaluate(context, temp);
             break;
          }
+         JLRelease(context, temp);
       }
    } else if(value->tag == JLVALUE_VARIABLE) {
       result = Lookup(context, value->value.str);
