@@ -558,6 +558,9 @@ void JLPrint(const JLContext *context, const JLValue *value)
    case JLVALUE_SPECIAL:
       printf("special@%p", value->value.special);
       break;
+   case JLVALUE_VARIABLE:
+      printf("%s", value->value.str);
+      break;
    default:
       printf("\n?\n");
       break;
