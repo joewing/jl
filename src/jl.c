@@ -41,6 +41,7 @@ void JLRelease(JLContext *context, JLValue *value)
             JLRelease(context, value->value.lst);
             break;
          case JLVALUE_STRING:
+         case JLVALUE_VARIABLE:
             free(value->value.str);
             break;
          case JLVALUE_SCOPE:
