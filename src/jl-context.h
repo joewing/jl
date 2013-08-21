@@ -26,4 +26,6 @@ void PutFree(JLContext *context, void *value);
 
 void FreeContext(JLContext *context);
 
+void Error(JLContext *context, const char *msg, ...);
+
 #endif /* JL_CONTEXT_H */

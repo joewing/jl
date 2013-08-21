@@ -37,7 +37,7 @@ static JLValue *IfFunc(JLContext *context, JLValue *value);
 static JLValue *LambdaFunc(JLContext *context, JLValue *value);
 static JLValue *ListFunc(JLContext *context, JLValue *value);
 static JLValue *RestFunc(JLContext *context, JLValue *value);
-static JLValue *CharFunc(JLContext *context, JLValue *args);
+static JLValue *SubstrFunc(JLContext *context, JLValue *args);
 static JLValue *ConcatFunc(JLContext *context, JLValue *args);
 static JLValue *IsNumberFunc(JLContext *context, JLValue *args);
 static JLValue *IsStringFunc(JLContext *context, JLValue *args);
@@ -67,7 +67,7 @@ static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "lambda",    LambdaFunc     },
    { "list",      ListFunc       },
    { "rest",      RestFunc       },
-   { "char",      CharFunc       },
+   { "substr",    SubstrFunc     },
    { "concat",    ConcatFunc     },
    { "number?",   IsNumberFunc   },
    { "string?",   IsStringFunc   },
@@ -390,26 +390,59 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *CharFunc(JLContext *context, JLValue *args)
+JLValue *SubstrFunc(JLContext *context, JLValue *args)
 {
-   JLValue *result = NULL;
-   JLValue *str = JLEvaluate(context, args->next);
-   if(str && str->tag == JLVALUE_STRING) {
-      JLValue *index = JLEvaluate(context, args->next->next);
-      if(index && index->tag == JLVALUE_NUMBER) {
-         const size_t len = strlen(str->value.str);
-         const size_t i = (size_t)index->value.number;
-         if(i < len) {
-            result = CreateValue(context, NULL, JLVALUE_STRING);
-            result->value.str = (char*)malloc(2);
-            result->value.str[0] = str->value.str[i];
-            result->value.str[1] = 0;
-         }
-      }
-      JLRelease(context, index);
+   JLValue *result   = NULL;
+   JLValue *str      = NULL;
+   JLValue *sval     = NULL;
+   JLValue *lval     = NULL;
+   size_t start      = 0;
+   size_t len        = (size_t)-1;
+   size_t slen;
+
+   str = JLEvaluate(context, args->next);
+   if(!str || str->tag != JLVALUE_STRING) {
+      Error(context, "substr: invalid string");
+      goto exit_substr;
    }
+
+   sval = JLEvaluate(context, args->next->next);
+   if(sval) {
+      if(sval->tag != JLVALUE_NUMBER) {
+         Error(context, "substr: invalid start");
+         goto exit_substr;
+      }
+      start = (size_t)sval->value.number;
+   }
+
+   if(args->next->next) {
+      lval = JLEvaluate(context, args->next->next->next);
+      if(lval) {
+         if(lval->tag != JLVALUE_NUMBER) {
+            Error(context, "substr: invalid length");
+            goto exit_substr;
+         }
+         len = (size_t)lval->value.number;
+      }
+   }
+
+   slen = strlen(str->value.str);
+   if(start < slen && len > 0) {
+      len = slen - start > len ? len : slen - start;
+      result = CreateValue(context, NULL, JLVALUE_STRING);
+      result->value.str = (char*)malloc(len + 1);
+      memcpy(result->value.str, &str->value.str[start], len);
+      result->value.str[len] = 0;
+   }
+
+exit_substr:
+
    JLRelease(context, str);
+   JLRelease(context, sval);
+   JLRelease(context, lval);
+
    return result;
+
 }
 
 JLValue *ConcatFunc(JLContext *context, JLValue *args)

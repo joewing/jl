@@ -56,7 +56,7 @@ The following built-in functions are available:
  - define   Insert a binding into the current namespace.
  - lambda   Declare a function.
  - begin    Execute a sequence of functions, return the value of the last.
- - char     Return a character of a string.
+ - substr   Return a substring of a string.
  - concat   Concatenate strings.
  - number?  Determine if a value is a number.
  - string?  Determine if a value is a string.

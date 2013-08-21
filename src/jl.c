@@ -8,16 +8,15 @@
 #include "jl-value.h"
 #include "jl-scope.h"
 #include "jl-func.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdarg.h>
 
 static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
-static void Error(JLContext *context, const char *msg, ...);
 
 void JLRetain(JLValue *value)
 {
@@ -468,17 +467,6 @@ JLValue *JLParse(JLContext *context, const char **line)
       }
    }
 
-}
-
-void Error(JLContext *context, const char *msg, ...)
-{
-   va_list ap;
-   va_start(ap, msg);
-   context->error = 1;
-   printf("ERROR[%d]: ", context->line);
-   vprintf(msg, ap);
-   printf("\n");
-   va_end(ap);
 }
 
 char JLIsNumber(JLValue *value)

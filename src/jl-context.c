@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #define BLOCK_SIZE   8192
 
@@ -62,5 +63,16 @@ void FreeContext(JLContext *context)
       context->blocks = next;
    }
    free(context);
+}
+
+void Error(JLContext *context, const char *msg, ...)
+{
+   va_list ap;
+   va_start(ap, msg);
+   context->error = 1;
+   printf("ERROR[%d]: ", context->line);
+   vprintf(msg, ap);
+   printf("\n");
+   va_end(ap);
 }
 
