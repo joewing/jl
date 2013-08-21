@@ -63,6 +63,7 @@ JLContext *JLCreateContext()
    JLContext *context = (JLContext*)malloc(sizeof(JLContext));
    context->scope = NULL;
    context->freelist = NULL;
+   context->blocks = NULL;
    context->line = 1;
    context->levels = 0;
    EnterScope(context);
