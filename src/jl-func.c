@@ -106,35 +106,38 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
       JLValue *vb = JLEvaluate(context, args->next->next);
       if(vb && vb->tag == va->tag) {
          double diff = 0.0;
+         char cond = 0;
          if(va->tag == JLVALUE_NUMBER) {
             diff = va->value.number - vb->value.number;
          } else if(va->tag == JLVALUE_STRING) {
             diff = strcmp(va->value.str, vb->value.str);
          }
-         result = JLDefineNumber(context, NULL, 0.0);
          switch(args->value.str[0]) {
          case '=':
-            result->value.number = diff == 0.0;
+            cond = diff == 0.0;
             break;
          case '!':
-            result->value.number = diff != 0.0;
+            cond = diff != 0.0;
             break;
          case '<':
             if(args->value.str[1] == '=') {
-               result->value.number = diff <= 0.0;
+               cond = diff <= 0.0;
             } else {
-               result->value.number = diff < 0.0;
+               cond = diff < 0.0;
             }
             break;
          case '>':
             if(args->value.str[1] == '=') {
-               result->value.number = diff >= 0.0;
+               cond = diff >= 0.0;
             } else {
-               result->value.number = diff > 0.0;
+               cond = diff > 0.0;
             }
             break;
          default:
             break;
+         }
+         if(cond) {
+            result = JLDefineNumber(context, NULL, 1.0);
          }
       }
       JLRelease(context, vb);

@@ -9,6 +9,9 @@
 #ifndef JL_H
 #define JL_H
 
+#define JL_VERSION_MAJOR   0
+#define JL_VERSION_MINOR   1
+
 struct JLValue;
 struct JLContext;
 

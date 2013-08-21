@@ -1,5 +1,5 @@
 /**
- * @file repl.c
+ * @file jli.c
  * @authoer Joe Wingbermuehle
  *
  * This is a REPL for interfacing with JL on the command line.
@@ -55,6 +55,9 @@ int main(int argc, char *argv[])
    } else if(argc != 1) {
       printf("usage: %s <file>\n", argv[0]);
       return -1;
+   } else {
+      printf("JL Interpreter v%d.%d\n", JL_VERSION_MAJOR, JL_VERSION_MINOR);
+      printf("Type ^D to exit\n");
    }
 
    context = JLCreateContext();

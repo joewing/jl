@@ -4,12 +4,12 @@ CFLAGS=-O2 -Wall -Werror -I. -g
 LDFLAGS=-g
 
 JLOBJS=src/jl.o src/jl-context.o src/jl-func.o src/jl-scope.o src/jl-value.o
-REPLOBJS=src/repl.o jl.a
+REPLOBJS=src/jli.o jl.a
 
-all: repl jl.a
+all: jli jl.a
 
-repl: $(REPLOBJS)
-	$(CC) $(LDFLAGS) $(REPLOBJS) -o repl
+jli: $(REPLOBJS)
+	$(CC) $(LDFLAGS) $(REPLOBJS) -o jli
 
 jl.a: $(JLOBJS)
 	ar r jl.a $(JLOBJS)
@@ -18,5 +18,5 @@ jl.a: $(JLOBJS)
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 
 clean:
-	rm -f repl jl.a src/*.o
+	rm -f jli jl.a src/*.o
 

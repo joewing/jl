@@ -104,5 +104,7 @@
 (assert (>= "b" "a"))
 (assert (>= "a" "a"))
 
+(assert (= ((lambda (a b) (+ a b 1)) 2 3) 6))
+
 (print "\ndone\n")
 
