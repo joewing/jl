@@ -95,5 +95,14 @@
 (assert (= 0 (list? "test")))
 (assert (= 1 (list? (head (list (list 1 2) 2 3)))))
 
+(assert (< "a" "b"))
+(assert (= "asdf" "asdf"))
+(assert (<= "a" "b"))
+(assert (<= "a" "a"))
+(assert (!= "ab" "ac"))
+(assert (> "b" "a"))
+(assert (>= "b" "a"))
+(assert (>= "a" "a"))
+
 (print "\ndone\n")
 
