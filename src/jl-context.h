@@ -14,8 +14,10 @@ typedef struct JLContext {
    struct ScopeNode *scope;
    struct FreeNode *freelist;
    struct BlockNode *blocks;
-   int line;
-   int levels;
+   unsigned int line;
+   unsigned int levels;
+   unsigned int max_levels;
+   char error;
 } JLContext;
 
 void *GetFree(JLContext *context);

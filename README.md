@@ -6,9 +6,7 @@ configuration files where it is desirable to be able to have complex
 configurations (JWM, for example).
 
 This is still a work in progress: there are still more functions to
-be implemented, errors are not yet handled in a graceful manner,
-and more comprehensive testing is needed.  However, simple programs
-seem to work.
+be implemented and the functionality of existing functions may change.
 
 Syntax
 ------------------------------------------------------------------------------
@@ -20,13 +18,14 @@ calls the "list" function, passing 1, 2, and 3 as arguments.
 
 Data Types
 ------------------------------------------------------------------------------
-There are 5 data types:
+There are 6 data types:
 
  1. Numbers (floating point numbers)
  2. Strings
- 3. Lambdas (functions defined within the language)
- 4. Lists
- 5. Special functions
+ 3. Variables
+ 4. Lambdas (functions defined within the language)
+ 5. Lists
+ 6. Special functions
 
 For comparisons, 0 and nil (the empty list) are considered false and all
 other values are considered true.

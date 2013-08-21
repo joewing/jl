@@ -13,14 +13,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/** Maximum number of evaluations to allow outstanding. */
-#define MAX_EVAL_LEVELS    (1 << 15)
-
 static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
-static void ParseError(JLContext *context, const char *msg, ...);
+static void Error(JLContext *context, const char *msg, ...);
 
 void JLRetain(JLValue *value)
 {
@@ -66,6 +63,8 @@ JLContext *JLCreateContext()
    context->blocks = NULL;
    context->line = 1;
    context->levels = 0;
+   context->max_levels = 1 << 15;
+   context->error = 0;
    EnterScope(context);
    RegisterFunctions(context);
    JLDefineValue(context, "nil", NULL);
@@ -128,11 +127,16 @@ JLValue *JLDefineNumber(JLContext *context,
 JLValue *JLEvaluate(JLContext *context, JLValue *value)
 {
    JLValue *result = NULL;
+   if(context->levels == 0) {
+      context->error = 0;
+   } else if(context->error) {
+      return NULL;
+   }
    context->levels += 1;
    if(value == NULL) {
       result = NULL;
-   } else if(context->levels > MAX_EVAL_LEVELS) {
-      ParseError(context, "maximum evaluation depth exceeded");
+   } else if(context->levels > context->max_levels) {
+      Error(context, "maximum evaluation depth exceeded");
       result = NULL;
    } else if(value->tag == JLVALUE_LIST &&
              value->value.lst &&
@@ -186,7 +190,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       lambda->value.lst->tag != JLVALUE_SCOPE ||
       lambda->value.lst->next == NULL ||
       lambda->value.lst->next->tag != JLVALUE_LIST) {
-      ParseError(context, "invalid lambda");
+      Error(context, "invalid lambda");
       return NULL;
    }
    scope = lambda->value.lst;
@@ -202,12 +206,12 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
    ap = args->next;  /* Skip the name */
    while(bp) {
       if(ap == NULL) {
-         ParseError(context, "too few arguments");
+         Error(context, "too few arguments");
          result = NULL;
          goto done_eval_lambda;
       }
       if(bp->tag != JLVALUE_VARIABLE) {
-         ParseError(context, "invalid lambda argument");
+         Error(context, "invalid lambda argument");
          result = NULL;
          goto done_eval_lambda;
       }
@@ -220,7 +224,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
       ap = ap->next;
    }
    if(ap) {
-      ParseError(context, "too many arguments");
+      Error(context, "too many arguments");
       result = NULL;
       goto done_eval_lambda;
    }
@@ -414,7 +418,7 @@ JLValue *JLParse(JLContext *context, const char **line)
       return NULL;
    }
    if(**line != '(') {
-      ParseError(context, "expected '('");
+      Error(context, "expected '('");
       *line += 1;
       return NULL;
    }
@@ -442,7 +446,7 @@ JLValue *JLParse(JLContext *context, const char **line)
          *line += 1;
          break;
       case 0:
-         ParseError(context, "expected ')', got end-of-input");
+         Error(context, "expected ')', got end-of-input");
          JLRelease(context, result);
          return NULL;
       case ')':
@@ -466,10 +470,11 @@ JLValue *JLParse(JLContext *context, const char **line)
 
 }
 
-void ParseError(JLContext *context, const char *msg, ...)
+void Error(JLContext *context, const char *msg, ...)
 {
    va_list ap;
    va_start(ap, msg);
+   context->error = 1;
    printf("ERROR[%d]: ", context->line);
    vprintf(msg, ap);
    printf("\n");
