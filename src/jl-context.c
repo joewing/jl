@@ -8,7 +8,10 @@
 #include "jl-scope.h"
 #include "jl-value.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+
+#define BLOCK_SIZE   8192
 
 typedef struct FreeNode {
    union {
@@ -19,14 +22,27 @@ typedef struct FreeNode {
    };
 } FreeNode;
 
+typedef struct BlockNode {
+   FreeNode nodes[BLOCK_SIZE];
+   struct BlockNode *next;
+} BlockNode;
+
 void *GetFree(JLContext *context)
 {
    FreeNode *node;
-   if(context->freelist) {
+   if(context->freelist == NULL) {
+      BlockNode *block = (BlockNode*)malloc(sizeof(BlockNode));
+      size_t i;
+      block->next = context->blocks;
+      context->blocks = block;
+      for(i = 1; i < BLOCK_SIZE; i++) {
+         block->nodes[i].next = context->freelist;
+         context->freelist = &block->nodes[i];
+      }
+      node = &block->nodes[0];
+   } else {
       node = context->freelist;
       context->freelist = node->next;
-   } else {
-      node = (FreeNode*)malloc(sizeof(FreeNode));
    }
    return node;
 }
@@ -40,10 +56,10 @@ void PutFree(JLContext *context, void *value)
 
 void FreeContext(JLContext *context)
 {
-   while(context->freelist) {
-      FreeNode *next = context->freelist->next;
-      free(context->freelist);
-      context->freelist = next;
+   while(context->blocks) {
+      BlockNode *next = context->blocks->next;
+      free(context->blocks);
+      context->blocks = next;
    }
    free(context);
 }

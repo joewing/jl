@@ -8,10 +8,12 @@
 
 struct ScopeNode;
 struct FreeNode;
+struct BlockNode;
 
 typedef struct JLContext {
    struct ScopeNode *scope;
    struct FreeNode *freelist;
+   struct BlockNode *blocks;
    int line;
    int levels;
 } JLContext;
