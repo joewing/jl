@@ -166,73 +166,96 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
 JLValue *AddFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
+   double sum = 0.0;
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number += arg->value.number;
+      if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
+         Error(context, "invalid argument to +");
+         JLRelease(context, arg);
+         return NULL;
       }
+      sum += arg->value.number;
       JLRelease(context, arg);
    }
-   return result;
+   return JLDefineNumber(context, NULL, sum);
 }
 
 JLValue *SubFunc(JLContext *context, JLValue *args)
 {
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
+   JLValue *vp = args->next;
+   JLValue *arg = NULL;
+   double total = 0.0;
+
+   arg = JLEvaluate(context, vp);
+   if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
+      Error(context, "invalid argument to -");
       JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg && arg->tag == JLVALUE_NUMBER) {
-            result->value.number -= arg->value.number;
-         }
-         JLRelease(context, arg);
-      }
+      return NULL;
    }
-   return result;
+   total = arg->value.number;
+   JLRelease(context, arg);
+
+   for(vp = vp->next; vp; vp = vp->next) {
+      arg = JLEvaluate(context, vp);
+      if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
+         Error(context, "invalid argument to -");
+         JLRelease(context, arg);
+         return NULL;
+      }
+      total -= arg->value.number;
+      JLRelease(context, arg);
+   }
+
+   return JLDefineNumber(context, NULL, total);
+
 }
 
 JLValue *MulFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 1.0);
+   double product = 1.0;
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
-      if(arg) {
-         result->value.number *= arg->value.number;
+      if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
+         Error(context, "invalid argument to *");
+         JLRelease(context, arg);
+         return NULL;
       }
+      product *= arg->value.number;
       JLRelease(context, arg);
    }
-   return result;
+   return JLDefineNumber(context, NULL, product);
 }
 
 JLValue *DivFunc(JLContext *context, JLValue *args)
 {
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
-      JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg) {
-            result->value.number /= arg->value.number;
-         }
-         JLRelease(context, arg);
-      }
+   JLValue *va = NULL;
+   JLValue *vb = NULL;
+   JLValue *result = NULL;
+
+   va = JLEvaluate(context, args->next);
+   if(va == NULL || va->tag != JLVALUE_NUMBER) {
+      Error(context, "invalid argument to /");
+      goto div_done;
    }
+   vb = JLEvaluate(context, args->next->next);
+   if(vb == NULL || vb->tag != JLVALUE_NUMBER) {
+      Error(context, "invalid argument to /");
+      goto div_done;
+   }
+   if(args->next->next->next) {
+      Error(context, "too many arguments to /");
+      goto div_done;
+   }
+
+   result = JLDefineNumber(context, NULL, va->value.number / vb->value.number);
+
+div_done:
+
+   JLRelease(context, va);
+   JLRelease(context, vb);
    return result;
+
 }
 
 JLValue *ModFunc(JLContext *context, JLValue *args)
