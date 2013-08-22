@@ -46,22 +46,23 @@ The following built-in functions are available:
  - /        Divide
  - %        Modulus
  - and      Logical AND.
- - or       Logical OR.
- - list     Create a list
+ - concat   Concatenate strings.
  - cons     Prepend an item to a list.
+ - begin    Execute a sequence of functions, return the value of the last.
+ - define   Insert a binding into the current namespace.
  - head     Return the first element of a list
- - rest     Return all but the first element of a list
  - if       Test a condition and evaluate and return the second argument
             if true, otherwise evaluate and return the third argument.
- - define   Insert a binding into the current namespace.
  - lambda   Declare a function.
- - begin    Execute a sequence of functions, return the value of the last.
- - substr   Return a substring of a string.
- - concat   Concatenate strings.
- - number?  Determine if a value is a number.
- - string?  Determine if a value is a string.
+ - list     Create a list
  - list?    Determine if a value is a list.
+ - not      Logical NOT.
  - null?    Determine if a value is nil.
+ - number?  Determine if a value is a number.
+ - or       Logical OR.
+ - rest     Return all but the first element of a list
+ - string?  Determine if a value is a string.
+ - substr   Return a substring of a string.
 
 Examples
 ------------------------------------------------------------------------------

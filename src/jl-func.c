@@ -248,35 +248,31 @@ JLValue *ModFunc(JLContext *context, JLValue *args)
 JLValue *AndFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 1.0);
    for(vp = args->next; vp; vp = vp->next) {
       if(!CheckCondition(context, vp)) {
-         result->value.number = 0.0;
-         break;
+         return NULL;
       }
    }
-   return result;
+   return JLDefineNumber(context, NULL, 1.0);
 }
 
 JLValue *OrFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
    for(vp = args->next; vp; vp = vp->next) {
       if(CheckCondition(context, vp)) {
-         result->value.number = 1.0;
-         break;
+         return JLDefineNumber(context, NULL, 1.0);
       }
    }
-   return result;
+   return NULL;
 }
 
 JLValue *NotFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = JLEvaluate(context, args->next);
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   if(vp && vp->tag == JLVALUE_NUMBER) {
-      result->value.number = vp->value.number == 0.0 ? 1.0 : 0.0;
+   JLValue *result = NULL;
+   if(!vp || (vp->tag == JLVALUE_NUMBER && vp->value.number == 0.0)) {
+      result = JLDefineNumber(context, NULL, 1.0);
    }
    JLRelease(context, vp);
    return result;
