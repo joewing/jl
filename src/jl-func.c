@@ -100,49 +100,66 @@ char CheckCondition(JLContext *context, JLValue *value)
 
 JLValue *CompareFunc(JLContext *context, JLValue *args)
 {
+   const char *op = args->value.str;
+   JLValue *va = NULL;
+   JLValue *vb = NULL;
    JLValue *result = NULL;
-   JLValue *va = JLEvaluate(context, args->next);
-   if(va && (va->tag == JLVALUE_STRING || va->tag == JLVALUE_NUMBER)) {
-      JLValue *vb = JLEvaluate(context, args->next->next);
-      if(vb && vb->tag == va->tag) {
-         double diff = 0.0;
-         char cond = 0;
-         if(va->tag == JLVALUE_NUMBER) {
-            diff = va->value.number - vb->value.number;
-         } else if(va->tag == JLVALUE_STRING) {
-            diff = strcmp(va->value.str, vb->value.str);
-         }
-         switch(args->value.str[0]) {
-         case '=':
-            cond = diff == 0.0;
-            break;
-         case '!':
-            cond = diff != 0.0;
-            break;
-         case '<':
-            if(args->value.str[1] == '=') {
-               cond = diff <= 0.0;
-            } else {
-               cond = diff < 0.0;
-            }
-            break;
-         case '>':
-            if(args->value.str[1] == '=') {
-               cond = diff >= 0.0;
-            } else {
-               cond = diff > 0.0;
-            }
-            break;
-         default:
-            break;
-         }
-         if(cond) {
-            result = JLDefineNumber(context, NULL, 1.0);
-         }
-      }
-      JLRelease(context, vb);
+   char cond = 0;
+   if(args->next == NULL || args->next->next == NULL) {
+      Error(context, "too few arguments to %s", op);
+      return NULL;
    }
+   if(args->next->next->next) {
+      Error(context, "too many arguments to %s", op);
+      return NULL;
+   }
+
+   va = JLEvaluate(context, args->next);
+   vb = JLEvaluate(context, args->next->next);
+   if(va == NULL || vb == NULL || va->tag != vb->tag) {
+
+      if(op[0] == '=') {
+         cond = va == vb;
+      } else if(op[0] == '!') {
+         cond = va != vb;
+      } else {
+         Error(context, "invalid arguments to %s", op);
+      }
+
+   } else {
+
+      /* Here we know that va and vb are not nil and are of the same type. */
+      double diff = 0.0;
+      if(va->tag == JLVALUE_NUMBER) {
+         diff = va->value.number - vb->value.number;
+      } else if(va->tag == JLVALUE_STRING) {
+         diff = strcmp(va->value.str, vb->value.str);
+      } else {
+         Error(context, "invalid arguments to %s", op);
+      }
+
+      if(op[0] == '=') {
+         cond = diff == 0.0;
+      } else if(op[0] == '!') {
+         cond = diff != 0.0;
+      } else if(op[0] == '<' && op[1] == 0) {
+         cond = diff < 0.0;
+      } else if(op[0] == '<' && op[1] == '=') {
+         cond = diff <= 0.0;
+      } else if(op[0] == '>' && op[1] == 0) {
+         cond = diff > 0.0;
+      } else if(op[0] == '>' && op[1] == '=') {
+         cond = diff >= 0.0;
+      }
+
+   }
+
+   if(cond) {
+      result = JLDefineNumber(context, NULL, 1.0);
+   }
+
    JLRelease(context, va);
+   JLRelease(context, vb);
    return result;
 }
 
@@ -472,8 +489,10 @@ JLValue *ConcatFunc(JLContext *context, JLValue *args)
 JLValue *IsNumberFunc(JLContext *context, JLValue *args)
 {
    JLValue *arg = JLEvaluate(context, args->next);
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   result->value.number = (arg && arg->tag == JLVALUE_NUMBER) ? 1.0 : 0.0;
+   JLValue *result = NULL;
+   if(arg && arg->tag == JLVALUE_NUMBER) {
+      result = JLDefineNumber(context, NULL, 1.0);
+   }
    JLRelease(context, arg);
    return result;
 }
@@ -481,8 +500,10 @@ JLValue *IsNumberFunc(JLContext *context, JLValue *args)
 JLValue *IsStringFunc(JLContext *context, JLValue *args)
 {
    JLValue *arg = JLEvaluate(context, args->next);
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   result->value.number = (arg && arg->tag == JLVALUE_STRING) ? 1.0 : 0.0;
+   JLValue *result = NULL;
+   if(arg && arg->tag == JLVALUE_STRING) {
+      result = JLDefineNumber(context, NULL, 1.0);
+   }
    JLRelease(context, arg);
    return result;
 }
@@ -490,8 +511,10 @@ JLValue *IsStringFunc(JLContext *context, JLValue *args)
 JLValue *IsListFunc(JLContext *context, JLValue *args)
 {
    JLValue *arg = JLEvaluate(context, args->next);
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   result->value.number = (arg && arg->tag == JLVALUE_LIST) ? 1.0 : 0.0;
+   JLValue *result = NULL;
+   if(arg && arg->tag == JLVALUE_LIST) {
+      result = JLDefineNumber(context, NULL, 1.0);
+   }
    JLRelease(context, arg);
    return result;
 }
@@ -499,10 +522,12 @@ JLValue *IsListFunc(JLContext *context, JLValue *args)
 JLValue *IsNullFunc(JLContext *context, JLValue *args)
 {
    JLValue *arg = JLEvaluate(context, args->next);
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   result->value.number = arg == NULL ? 1.0 : 0.0;
-   JLRelease(context, arg);
-   return result;
+   if(arg == NULL) {
+      return JLDefineNumber(context, NULL, 1.0);
+   } else {
+      JLRelease(context, arg);
+      return NULL;
+   }
 }
 
 void RegisterFunctions(JLContext *context)
