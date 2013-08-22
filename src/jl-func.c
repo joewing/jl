@@ -260,29 +260,39 @@ div_done:
 
 JLValue *ModFunc(JLContext *context, JLValue *args)
 {
-   JLValue *vp;
-   JLValue *result = JLDefineNumber(context, NULL, 0.0);
-   vp = args->next;
-   if(vp) {
-      JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_NUMBER) {
-         result->value.number = arg->value.number;
-      }
-      JLRelease(context, arg);
-      for(vp = vp->next; vp; vp = vp->next) {
-         arg = JLEvaluate(context, vp);
-         if(arg) {
-            const long d = (long)arg->value.number;
-            if(d) {
-               result->value.number = (long)result->value.number % d;
-            } else {
-               result->value.number = 0.0;
-            }
-         }
-         JLRelease(context, arg);
-      }
+
+   JLValue *va = NULL;
+   JLValue *vb = NULL;
+   JLValue *result = NULL;
+   long temp;
+
+   va = JLEvaluate(context, args->next);
+   if(va == NULL || va->tag != JLVALUE_NUMBER) {
+      Error(context, "invalid argument to %");
+      goto mod_done;
    }
+   vb = JLEvaluate(context, args->next->next);
+   if(vb == NULL || vb->tag != JLVALUE_NUMBER) {
+      Error(context, "invalid argument to %");
+      goto mod_done;
+   }
+   if(args->next->next->next) {
+      Error(context, "too many arguments to %");
+      goto mod_done;
+   }
+   temp = (long)vb->value.number;
+   if(temp == 0) {
+      goto mod_done;
+   }
+
+   result = JLDefineNumber(context, NULL, (long)va->value.number % temp);
+
+mod_done:
+
+   JLRelease(context, va);
+   JLRelease(context, vb);
    return result;
+
 }
 
 JLValue *AndFunc(JLContext *context, JLValue *args)
