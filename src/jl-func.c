@@ -407,10 +407,16 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp = args->next;
    JLValue *result = NULL;
-   if(vp && vp->tag == JLVALUE_VARIABLE) {
-      result = JLEvaluate(context, vp->next);
-      JLDefineValue(context, vp->value.str, result);
+   if(vp == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
    }
+   if(vp->tag != JLVALUE_VARIABLE) {
+      InvalidArgumentError(context, args);
+      return NULL;
+   }
+   result = JLEvaluate(context, vp->next);
+   JLDefineValue(context, vp->value.str, result);
    return result;
 }
 
@@ -418,10 +424,17 @@ JLValue *HeadFunc(JLContext *context, JLValue *args)
 {
    JLValue *result = NULL;
    JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST) {
-      result = vp->value.lst;
-      JLRetain(result);
+
+   if(vp == NULL || vp->tag != JLVALUE_LIST) {
+      InvalidArgumentError(context, args);
+      goto head_done;
    }
+
+   result = vp->value.lst;
+   JLRetain(result);
+
+head_done:
+
    JLRelease(context, vp);
    return result;
 }
