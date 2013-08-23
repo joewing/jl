@@ -156,7 +156,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
    } else if(value->tag == JLVALUE_VARIABLE) {
       result = Lookup(context, value->value.str);
       JLRetain(result);
-   } else {
+   } else if(value->tag != JLVALUE_NIL) {
       result = value;
       JLRetain(result);
    }
@@ -257,7 +257,7 @@ JLValue *ParseLiteral(JLContext *context, const char **line)
     * strings and floating-point numbers.
     */
 
-   JLValue *result = CreateValue(context, NULL, JLVALUE_INVALID);
+   JLValue *result = CreateValue(context, NULL, JLVALUE_NIL);
 
    if(**line == '\"') {
       size_t max_len = 16;
@@ -518,7 +518,7 @@ JLValue *JLGetNext(JLValue *value)
 void JLPrint(const JLContext *context, const JLValue *value)
 {
    JLValue *temp;
-   if(value == NULL) {
+   if(value == NULL || value->tag == JLVALUE_NIL) {
       printf("nil");
       return;
    }

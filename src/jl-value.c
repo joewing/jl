@@ -19,20 +19,25 @@ JLValue *CreateValue(JLContext *context, const char *name, JLValueType tag)
 
 JLValue *CopyValue(JLContext *context, const JLValue *other)
 {
-   JLValue *result = CreateValue(context, NULL, other->tag);
-   result->value = other->value;
-   switch(result->tag) {
-   case JLVALUE_LIST:
-   case JLVALUE_LAMBDA:
-   case JLVALUE_SCOPE:
-      JLRetain(result->value.lst);
-      break;
-   case JLVALUE_STRING:
-   case JLVALUE_VARIABLE:
-      result->value.str = strdup(result->value.str);
-      break;
-   default:
-      break;
+   JLValue *result = NULL;
+   if(other) {
+      result = CreateValue(context, NULL, other->tag);
+      result->value = other->value;
+      switch(result->tag) {
+      case JLVALUE_LIST:
+      case JLVALUE_LAMBDA:
+      case JLVALUE_SCOPE:
+         JLRetain(result->value.lst);
+         break;
+      case JLVALUE_STRING:
+      case JLVALUE_VARIABLE:
+         result->value.str = strdup(result->value.str);
+         break;
+      default:
+         break;
+      }
+   } else {
+      result = CreateValue(context, NULL, JLVALUE_NIL);
    }
    return result;
 }

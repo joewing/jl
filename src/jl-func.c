@@ -367,21 +367,40 @@ JLValue *BeginFunc(JLContext *context, JLValue *args)
 
 JLValue *ConsFunc(JLContext *context, JLValue *args)
 {
-   JLValue *value = JLEvaluate(context, args->next);
-   if(value) {
-      JLValue *head = CopyValue(context, value);
-      JLValue *result = CreateValue(context, NULL, JLVALUE_LIST);
-      JLValue *rest = JLEvaluate(context, args->next->next);
-      if(rest && rest->tag == JLVALUE_LIST) {
-         head->next = rest->value.lst;
-         JLRetain(rest->value.lst);
-      }
-      JLRelease(context, rest);
-      JLRelease(context, value);
-      result->value.lst = head;
-      return result;
+   JLValue *head = NULL;
+   JLValue *rest = NULL;
+   JLValue *temp = NULL;
+   JLValue *result = NULL;
+
+   if(args->next == NULL || args->next->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
    }
-   return NULL;
+   if(args->next->next->next) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+
+   rest = JLEvaluate(context, args->next->next);
+   if(rest != NULL && rest->tag != JLVALUE_LIST) {
+      InvalidArgumentError(context, args);
+      JLRelease(context, rest);
+      return NULL;
+   }
+
+   temp = JLEvaluate(context, args->next);
+   head = CopyValue(context, temp);
+   JLRelease(context, temp);
+
+   result = CreateValue(context, NULL, JLVALUE_LIST);
+   if(rest) {
+      head->next = rest->value.lst;
+      JLRetain(rest->value.lst);
+      JLRelease(context, rest);
+   }
+   result->value.lst = head;
+
+   return result;
 }
 
 JLValue *DefineFunc(JLContext *context, JLValue *args)

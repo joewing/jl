@@ -10,7 +10,7 @@
 
 /** Possible value types. */
 typedef char JLValueType;
-#define JLVALUE_INVALID    0     /**< Invalid value. */
+#define JLVALUE_NIL        0     /**< Nil. */
 #define JLVALUE_NUMBER     1     /**< Literal number. */
 #define JLVALUE_STRING     2     /**< Literal string. */
 #define JLVALUE_LIST       3     /**< Linked list. */
