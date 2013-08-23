@@ -23,23 +23,23 @@ static void InvalidArgumentError(JLContext *context, JLValue *args);
 static void TooManyArgumentsError(JLContext *context, JLValue *args);
 static void TooFewArgumentsError(JLContext *context, JLValue *args);
 
-static JLValue *CompareFunc(JLContext *context, JLValue *value);
-static JLValue *AddFunc(JLContext *context, JLValue *value);
-static JLValue *SubFunc(JLContext *context, JLValue *value);
-static JLValue *MulFunc(JLContext *context, JLValue *value);
-static JLValue *DivFunc(JLContext *context, JLValue *value);
-static JLValue *ModFunc(JLContext *context, JLValue *value);
-static JLValue *AndFunc(JLContext *context, JLValue *value);
-static JLValue *OrFunc(JLContext *context, JLValue *value);
-static JLValue *NotFunc(JLContext *context, JLValue *value);
-static JLValue *BeginFunc(JLContext *context, JLValue *value);
-static JLValue *ConsFunc(JLContext *context, JLValue *value);
-static JLValue *DefineFunc(JLContext *context, JLValue *value);
-static JLValue *HeadFunc(JLContext *context, JLValue *value);
-static JLValue *IfFunc(JLContext *context, JLValue *value);
-static JLValue *LambdaFunc(JLContext *context, JLValue *value);
-static JLValue *ListFunc(JLContext *context, JLValue *value);
-static JLValue *RestFunc(JLContext *context, JLValue *value);
+static JLValue *CompareFunc(JLContext *context, JLValue *args);
+static JLValue *AddFunc(JLContext *context, JLValue *args);
+static JLValue *SubFunc(JLContext *context, JLValue *args);
+static JLValue *MulFunc(JLContext *context, JLValue *args);
+static JLValue *DivFunc(JLContext *context, JLValue *args);
+static JLValue *ModFunc(JLContext *context, JLValue *args);
+static JLValue *AndFunc(JLContext *context, JLValue *args);
+static JLValue *OrFunc(JLContext *context, JLValue *args);
+static JLValue *NotFunc(JLContext *context, JLValue *args);
+static JLValue *BeginFunc(JLContext *context, JLValue *args);
+static JLValue *ConsFunc(JLContext *context, JLValue *args);
+static JLValue *DefineFunc(JLContext *context, JLValue *args);
+static JLValue *HeadFunc(JLContext *context, JLValue *args);
+static JLValue *IfFunc(JLContext *context, JLValue *args);
+static JLValue *LambdaFunc(JLContext *context, JLValue *args);
+static JLValue *ListFunc(JLContext *context, JLValue *args);
+static JLValue *RestFunc(JLContext *context, JLValue *args);
 static JLValue *SubstrFunc(JLContext *context, JLValue *args);
 static JLValue *ConcatFunc(JLContext *context, JLValue *args);
 static JLValue *IsNumberFunc(JLContext *context, JLValue *args);
@@ -450,15 +450,25 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
    return NULL;
 }
 
-JLValue *LambdaFunc(JLContext *context, JLValue *value)
+JLValue *LambdaFunc(JLContext *context, JLValue *args)
 {
-   JLValue *result = CreateValue(context, NULL, JLVALUE_LAMBDA);
-   JLValue *scope = CreateValue(context, NULL, JLVALUE_SCOPE);
+   JLValue *result;
+   JLValue *scope;
+
+   if(args->next == NULL || args->next->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
+   }
+
+   scope = CreateValue(context, NULL, JLVALUE_SCOPE);
    scope->value.scope = context->scope;
    context->scope->count += 1;
+
+   result = CreateValue(context, NULL, JLVALUE_LAMBDA);
    result->value.lst = scope;
-   result->value.lst->next = value->next;
-   JLRetain(value->next);
+   result->value.lst->next = args->next;
+   JLRetain(args->next);
+
    return result;
 }
 
@@ -484,13 +494,20 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
 {
    JLValue *result = NULL;
    JLValue *vp = JLEvaluate(context, args->next);
-   if(vp && vp->tag == JLVALUE_LIST) {
-      if(vp->value.lst && vp->value.lst->next) {
-         result = CreateValue(context, NULL, JLVALUE_LIST);
-         result->value.lst = vp->value.lst->next;
-         JLRetain(result->value.lst);
-      }
+
+   if(vp == NULL || vp->tag != JLVALUE_LIST) {
+      InvalidArgumentError(context, args);
+      goto rest_done;
    }
+
+   if(vp->value.lst && vp->value.lst->next) {
+      result = CreateValue(context, NULL, JLVALUE_LIST);
+      result->value.lst = vp->value.lst->next;
+      JLRetain(result->value.lst);
+   }
+
+rest_done:
+
    JLRelease(context, vp);
    return result;
 }
@@ -508,24 +525,28 @@ JLValue *SubstrFunc(JLContext *context, JLValue *args)
    str = JLEvaluate(context, args->next);
    if(!str || str->tag != JLVALUE_STRING) {
       InvalidArgumentError(context, args);
-      goto exit_substr;
+      goto substr_done;
    }
 
    sval = JLEvaluate(context, args->next->next);
    if(sval) {
       if(sval->tag != JLVALUE_NUMBER) {
          InvalidArgumentError(context, args);
-         goto exit_substr;
+         goto substr_done;
       }
       start = (size_t)sval->value.number;
    }
 
    if(args->next->next) {
+      if(args->next->next->next && args->next->next->next->next) {
+         TooManyArgumentsError(context, args);
+         goto substr_done;
+      }
       lval = JLEvaluate(context, args->next->next->next);
       if(lval) {
          if(lval->tag != JLVALUE_NUMBER) {
             InvalidArgumentError(context, args);
-            goto exit_substr;
+            goto substr_done;
          }
          len = (size_t)lval->value.number;
       }
@@ -540,7 +561,7 @@ JLValue *SubstrFunc(JLContext *context, JLValue *args)
       result->value.str[len] = 0;
    }
 
-exit_substr:
+substr_done:
 
    JLRelease(context, str);
    JLRelease(context, sval);
@@ -559,7 +580,12 @@ JLValue *ConcatFunc(JLContext *context, JLValue *args)
    result->value.str = (char*)malloc(max_len);
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
-      if(arg && arg->tag == JLVALUE_STRING) {
+      if(arg == NULL || arg->tag != JLVALUE_STRING) {
+         InvalidArgumentError(context, args);
+         JLRelease(context, arg);
+         JLRelease(context, result);
+         return NULL;
+      } else {
          const size_t l = strlen(arg->value.str);
          const size_t new_len = len + l;
          if(new_len >= max_len) {
@@ -577,8 +603,19 @@ JLValue *ConcatFunc(JLContext *context, JLValue *args)
 
 JLValue *IsNumberFunc(JLContext *context, JLValue *args)
 {
-   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *arg = NULL;
    JLValue *result = NULL;
+
+   if(args->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
+   }
+   if(args->next->next) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+
+   arg = JLEvaluate(context, args->next);
    if(arg && arg->tag == JLVALUE_NUMBER) {
       result = JLDefineNumber(context, NULL, 1.0);
    }
@@ -588,19 +625,42 @@ JLValue *IsNumberFunc(JLContext *context, JLValue *args)
 
 JLValue *IsStringFunc(JLContext *context, JLValue *args)
 {
-   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *arg = NULL;
    JLValue *result = NULL;
+
+   if(args->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
+   }
+   if(args->next->next) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+
+   arg = JLEvaluate(context, args->next);
    if(arg && arg->tag == JLVALUE_STRING) {
       result = JLDefineNumber(context, NULL, 1.0);
    }
    JLRelease(context, arg);
    return result;
+
 }
 
 JLValue *IsListFunc(JLContext *context, JLValue *args)
 {
-   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *arg = NULL;
    JLValue *result = NULL;
+
+   if(args->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
+   }
+   if(args->next->next) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+
+   arg = JLEvaluate(context, args->next);
    if(arg && arg->tag == JLVALUE_LIST) {
       result = JLDefineNumber(context, NULL, 1.0);
    }
@@ -610,7 +670,18 @@ JLValue *IsListFunc(JLContext *context, JLValue *args)
 
 JLValue *IsNullFunc(JLContext *context, JLValue *args)
 {
-   JLValue *arg = JLEvaluate(context, args->next);
+   JLValue *arg = NULL;
+
+   if(args->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
+   }
+   if(args->next->next) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+
+   arg = JLEvaluate(context, args->next);
    if(arg == NULL) {
       return JLDefineNumber(context, NULL, 1.0);
    } else {
