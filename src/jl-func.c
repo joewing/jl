@@ -395,7 +395,7 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
    result = CreateValue(context, NULL, JLVALUE_LIST);
    if(rest) {
       head->next = rest->value.lst;
-      JLRetain(rest->value.lst);
+      JLRetain(context, rest->value.lst);
       JLRelease(context, rest);
    }
    result->value.lst = head;
@@ -431,7 +431,7 @@ JLValue *HeadFunc(JLContext *context, JLValue *args)
    }
 
    result = vp->value.lst;
-   JLRetain(result);
+   JLRetain(context, result);
 
 head_done:
 
@@ -467,7 +467,7 @@ JLValue *LambdaFunc(JLContext *context, JLValue *args)
    result = CreateValue(context, NULL, JLVALUE_LAMBDA);
    result->value.lst = scope;
    result->value.lst->next = args->next;
-   JLRetain(args->next);
+   JLRetain(context, args->next);
 
    return result;
 }
@@ -503,7 +503,7 @@ JLValue *RestFunc(JLContext *context, JLValue *args)
    if(vp->value.lst && vp->value.lst->next) {
       result = CreateValue(context, NULL, JLVALUE_LIST);
       result->value.lst = vp->value.lst->next;
-      JLRetain(result->value.lst);
+      JLRetain(context, result->value.lst);
    }
 
 rest_done:

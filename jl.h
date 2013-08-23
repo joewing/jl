@@ -34,8 +34,11 @@ struct JLContext *JLCreateContext();
  */
 void JLDestroyContext(struct JLContext *context);
 
-/** Increase the reference count of a value. */
-void JLRetain(struct JLValue *value);
+/** Increase the reference count of a value.
+ * @param context The context containing the value.
+ * @param value The value (can be NULL).
+ */
+void JLRetain(struct JLContext *context, struct JLValue *value);
 
 /** Decrease the reference count of a value.
  * This will destroy the value if the reference count reaches zero.

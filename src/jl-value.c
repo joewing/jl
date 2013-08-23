@@ -27,7 +27,7 @@ JLValue *CopyValue(JLContext *context, const JLValue *other)
       case JLVALUE_LIST:
       case JLVALUE_LAMBDA:
       case JLVALUE_SCOPE:
-         JLRetain(result->value.lst);
+         JLRetain(context, result->value.lst);
          break;
       case JLVALUE_STRING:
       case JLVALUE_VARIABLE:

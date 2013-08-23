@@ -18,7 +18,7 @@ static JLValue *EvalLambda(JLContext *context,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
 
-void JLRetain(JLValue *value)
+void JLRetain(JLContext *context, JLValue *value)
 {
    if(value) {
       value->count += 1;
@@ -80,7 +80,7 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 {
    if(name) {
       BindingNode **root = &context->scope->bindings;
-      JLRetain(value);
+      JLRetain(context, value);
       while(*root) {
          const int v = strcmp((*root)->name, name);
          if(v < 0) {
@@ -155,10 +155,10 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       }
    } else if(value->tag == JLVALUE_VARIABLE) {
       result = Lookup(context, value->value.str);
-      JLRetain(result);
+      JLRetain(context, result);
    } else if(value->tag != JLVALUE_NIL) {
       result = value;
-      JLRetain(result);
+      JLRetain(context, result);
    }
    context->levels -= 1;
    return result;
