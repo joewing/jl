@@ -19,6 +19,9 @@ typedef struct InternalFunctionNode {
 } InternalFunctionNode;
 
 static char CheckCondition(JLContext *context, JLValue *value);
+static void InvalidArgumentError(JLContext *context, JLValue *args);
+static void TooManyArgumentsError(JLContext *context, JLValue *args);
+static void TooFewArgumentsError(JLContext *context, JLValue *args);
 
 static JLValue *CompareFunc(JLContext *context, JLValue *value);
 static JLValue *AddFunc(JLContext *context, JLValue *value);
@@ -98,6 +101,21 @@ char CheckCondition(JLContext *context, JLValue *value)
    return rc;
 }
 
+void InvalidArgumentError(JLContext *context, JLValue *args)
+{
+   Error(context, "invalid argument to %s", args->value.str);
+}
+
+void TooManyArgumentsError(JLContext *context, JLValue *args)
+{
+   Error(context, "too many arguments to %s", args->value.str);
+}
+
+void TooFewArgumentsError(JLContext *context, JLValue *args)
+{
+   Error(context, "too few arguments to %s", args->value.str);
+}
+
 JLValue *CompareFunc(JLContext *context, JLValue *args)
 {
    const char *op = args->value.str;
@@ -106,11 +124,11 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
    JLValue *result = NULL;
    char cond = 0;
    if(args->next == NULL || args->next->next == NULL) {
-      Error(context, "too few arguments to %s", op);
+      TooFewArgumentsError(context, args);
       return NULL;
    }
    if(args->next->next->next) {
-      Error(context, "too many arguments to %s", op);
+      TooManyArgumentsError(context, args);
       return NULL;
    }
 
@@ -123,7 +141,7 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
       } else if(op[0] == '!') {
          cond = va != vb;
       } else {
-         Error(context, "invalid arguments to %s", op);
+         InvalidArgumentError(context, args);
       }
 
    } else {
@@ -135,7 +153,7 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
       } else if(va->tag == JLVALUE_STRING) {
          diff = strcmp(va->value.str, vb->value.str);
       } else {
-         Error(context, "invalid arguments to %s", op);
+         InvalidArgumentError(context, args);
       }
 
       if(op[0] == '=') {
@@ -170,7 +188,7 @@ JLValue *AddFunc(JLContext *context, JLValue *args)
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
-         Error(context, "invalid argument to +");
+         InvalidArgumentError(context, args);
          JLRelease(context, arg);
          return NULL;
       }
@@ -188,7 +206,7 @@ JLValue *SubFunc(JLContext *context, JLValue *args)
 
    arg = JLEvaluate(context, vp);
    if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
-      Error(context, "invalid argument to -");
+      InvalidArgumentError(context, args);
       JLRelease(context, arg);
       return NULL;
    }
@@ -198,7 +216,7 @@ JLValue *SubFunc(JLContext *context, JLValue *args)
    for(vp = vp->next; vp; vp = vp->next) {
       arg = JLEvaluate(context, vp);
       if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
-         Error(context, "invalid argument to -");
+         InvalidArgumentError(context, args);
          JLRelease(context, arg);
          return NULL;
       }
@@ -217,7 +235,7 @@ JLValue *MulFunc(JLContext *context, JLValue *args)
    for(vp = args->next; vp; vp = vp->next) {
       JLValue *arg = JLEvaluate(context, vp);
       if(arg == NULL || arg->tag != JLVALUE_NUMBER) {
-         Error(context, "invalid argument to *");
+         InvalidArgumentError(context, args);
          JLRelease(context, arg);
          return NULL;
       }
@@ -235,16 +253,16 @@ JLValue *DivFunc(JLContext *context, JLValue *args)
 
    va = JLEvaluate(context, args->next);
    if(va == NULL || va->tag != JLVALUE_NUMBER) {
-      Error(context, "invalid argument to /");
+      InvalidArgumentError(context, args);
       goto div_done;
    }
    vb = JLEvaluate(context, args->next->next);
    if(vb == NULL || vb->tag != JLVALUE_NUMBER) {
-      Error(context, "invalid argument to /");
+      InvalidArgumentError(context, args);
       goto div_done;
    }
    if(args->next->next->next) {
-      Error(context, "too many arguments to /");
+      TooManyArgumentsError(context, args);
       goto div_done;
    }
 
@@ -268,16 +286,16 @@ JLValue *ModFunc(JLContext *context, JLValue *args)
 
    va = JLEvaluate(context, args->next);
    if(va == NULL || va->tag != JLVALUE_NUMBER) {
-      Error(context, "invalid argument to %");
+      InvalidArgumentError(context, args);
       goto mod_done;
    }
    vb = JLEvaluate(context, args->next->next);
    if(vb == NULL || vb->tag != JLVALUE_NUMBER) {
-      Error(context, "invalid argument to %");
+      InvalidArgumentError(context, args);
       goto mod_done;
    }
    if(args->next->next->next) {
-      Error(context, "too many arguments to %");
+      TooManyArgumentsError(context, args);
       goto mod_done;
    }
    temp = (long)vb->value.number;
@@ -319,13 +337,19 @@ JLValue *OrFunc(JLContext *context, JLValue *args)
 
 JLValue *NotFunc(JLContext *context, JLValue *args)
 {
-   JLValue *vp = JLEvaluate(context, args->next);
-   JLValue *result = NULL;
-   if(!vp || (vp->tag == JLVALUE_NUMBER && vp->value.number == 0.0)) {
-      result = JLDefineNumber(context, NULL, 1.0);
+   if(args->next == NULL) {
+      TooFewArgumentsError(context, args);
+      return NULL;
    }
-   JLRelease(context, vp);
-   return result;
+   if(args->next->next != NULL) {
+      TooManyArgumentsError(context, args);
+      return NULL;
+   }
+   if(!CheckCondition(context, args->next)) {
+      return JLDefineNumber(context, NULL, 1.0);
+   } else {
+      return NULL;
+   }
 }
 
 JLValue *BeginFunc(JLContext *context, JLValue *args)
@@ -451,14 +475,14 @@ JLValue *SubstrFunc(JLContext *context, JLValue *args)
 
    str = JLEvaluate(context, args->next);
    if(!str || str->tag != JLVALUE_STRING) {
-      Error(context, "substr: invalid string");
+      InvalidArgumentError(context, args);
       goto exit_substr;
    }
 
    sval = JLEvaluate(context, args->next->next);
    if(sval) {
       if(sval->tag != JLVALUE_NUMBER) {
-         Error(context, "substr: invalid start");
+         InvalidArgumentError(context, args);
          goto exit_substr;
       }
       start = (size_t)sval->value.number;
@@ -468,7 +492,7 @@ JLValue *SubstrFunc(JLContext *context, JLValue *args)
       lval = JLEvaluate(context, args->next->next->next);
       if(lval) {
          if(lval->tag != JLVALUE_NUMBER) {
-            Error(context, "substr: invalid length");
+            InvalidArgumentError(context, args);
             goto exit_substr;
          }
          len = (size_t)lval->value.number;
