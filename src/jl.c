@@ -17,6 +17,7 @@ static JLValue *EvalLambda(JLContext *context,
                            const JLValue *lambda,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
+static JLValue *ParseList(JLContext *context, const char **line);
 
 void JLRetain(JLContext *context, JLValue *value)
 {
@@ -366,7 +367,7 @@ JLValue *ParseLiteral(JLContext *context, const char **line)
       /* Determine how long this token is. */
       while(**line != 0 && **line != '(' && **line != ')' &&
             **line != ' ' && **line != '\t' && **line != '\r' &&
-            **line != '\n') {
+            **line != '\n' && **line != ';') {
          len += 1;
          *line += 1;
       }
@@ -390,13 +391,43 @@ JLValue *ParseLiteral(JLContext *context, const char **line)
 
 }
 
-JLValue *JLParse(JLContext *context, const char **line)
+JLValue *ParseList(JLContext *context, const char **line)
 {
 
    JLValue *result;
    JLValue **item;
 
-   /* Skip any leading white-space. */
+   *line += 1;    /* Skip '(' */
+
+   result = CreateValue(context, NULL, JLVALUE_LIST);
+   result->value.lst = NULL;
+   item = &result->value.lst;
+
+   while(**line && **line != ')') {
+      JLValue *temp = JLParse(context, line);
+      if(temp == NULL) {
+         break;
+      }
+      *item = temp;
+      item = &(*item)->next;
+   }
+
+   if(**line != ')') {
+      Error(context, "expected ')'");
+      JLRelease(context, result);
+      return NULL;
+   }
+
+   *line += 1;    /* Skip ')' */
+
+   return result;
+
+}
+
+JLValue *JLParse(JLContext *context, const char **line)
+{
+
+   /* Skip leading white-space. */
    for(;;) {
       if(**line == ';') {
          while(**line && **line != '\n') {
@@ -412,58 +443,17 @@ JLValue *JLParse(JLContext *context, const char **line)
       *line += 1;
    }
 
-   if(**line == 0) {
+   switch(**line) {
+   case 0:
       return NULL;
-   }
-   if(**line != '(') {
-      Error(context, "expected '('");
+   case ')':
+      Error(context, "unexpected ')'");
       *line += 1;
       return NULL;
-   }
-   *line += 1;
-
-   result = CreateValue(context, NULL, JLVALUE_LIST);
-   result->value.lst = NULL;
-   item = &result->value.lst;
-
-   for(;;) {
-
-      /* Process the next token. */
-      switch(**line) {
-      case ';':      /* Start of a comment, skip to the next line. */
-         while(**line && **line != '\n') {
-            *line += 1;
-         }
-         break;
-      case '\n':
-         context->line += 1;
-         /* Fall through */
-      case ' ':
-      case '\t':
-      case '\r':
-         *line += 1;
-         break;
-      case 0:
-         Error(context, "expected ')', got end-of-input");
-         JLRelease(context, result);
-         return NULL;
-      case ')':
-         *line += 1;
-         return result;
-      case '(':
-         *item = JLParse(context, line);
-         if(*item) {
-            item = &(*item)->next;
-         } else {
-            JLRelease(context, result);
-            return NULL;
-         }
-         break;
-      default:
-         *item = ParseLiteral(context, line);
-         item = &(*item)->next;
-         break;
-      }
+   case '(':
+      return ParseList(context, line);
+   default:
+      return ParseLiteral(context, line);
    }
 
 }

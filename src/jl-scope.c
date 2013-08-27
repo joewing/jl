@@ -86,6 +86,7 @@ JLValue *Lookup(JLContext *context, const char *name)
       }
       scope = scope->next;
    }
+   Error(context, "symbol not found: %s", name);
    return NULL;
 }
 
