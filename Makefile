@@ -13,8 +13,7 @@ jli: $(REPLOBJS)
 	strip jli
 
 libjl.so: $(JLOBJS)
-	$(CC) $(LDFLAGS) -shared $(JLOBJS) -Wl,--version-script=jl.map -o libjl.so
-	strip libjl.so
+	$(CC) $(LDFLAGS) -shared $(JLOBJS) -o libjl.so
 
 jl.a: $(JLOBJS)
 	ar r jl.a $(JLOBJS)
