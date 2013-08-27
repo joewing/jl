@@ -1,0 +1,21 @@
+
+JL_1.0 {
+   global:  JLCreateContext;
+            JLDestroyContext;
+            JLRetain;
+            JLRelease;
+            JLDefineValue;
+            JLDefineSpecial;
+            JLDefineNumber;
+            JLParse;
+            JLEvaluate;
+            JLIsNumber;
+            JLGetNumber;
+            JLIsString;
+            JLGetString;
+            JLIsList;
+            JLGetHead;
+            JLGetNext;
+            JLPrint;
+   local: *;
+};
