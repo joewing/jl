@@ -215,17 +215,29 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
          goto done_eval_lambda;
       }
       context->scope = old_scope;
-      result = JLEvaluate(context, ap);
+      if(bp->next == NULL && ap->next != NULL) {
+
+         /* Make the rest of the arguments into a list parameter. */
+         result = CreateValue(context, NULL, JLVALUE_LIST);
+         JLValue **item = &result->value.lst;
+         while(ap) {
+            *item = JLEvaluate(context, ap);
+            item = &(*item)->next;
+            ap = ap->next;
+         }
+
+      } else {
+
+         /* A single matching parameter. */
+         result = JLEvaluate(context, ap);
+         ap = ap->next;
+
+      }
       context->scope = new_scope;
+
       JLDefineValue(context, bp->value.str, result);
       JLRelease(context, result);
       bp = bp->next;
-      ap = ap->next;
-   }
-   if(ap) {
-      Error(context, "too many arguments");
-      result = NULL;
-      goto done_eval_lambda;
    }
 
    result = NULL;
