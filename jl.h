@@ -9,6 +9,10 @@
 #ifndef JL_H
 #define JL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define JL_VERSION_MAJOR   0
 #define JL_VERSION_MINOR   1
 
@@ -165,5 +169,9 @@ struct JLValue *JLGetNext(struct JLValue *value);
  */
 JLEXPORT
 void JLPrint(const struct JLContext *context, const struct JLValue *value);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* JL_H */
