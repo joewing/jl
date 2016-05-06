@@ -1,0 +1,44 @@
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+LDFLAGS = @LDFLAGS@
+BINDIR = $(DESTDIR)@BINDIR@
+LIBDIR = $(DESTDIR)@LIBDIR@
+CFLAGS=-O2 -Wall -Werror -I. -fpic -fvisibility=hidden
+LDFLAGS=
+
+JLOBJS = \
+    src/jl.o src/jl-context.o src/jl-func.o src/jl-scope.o src/jl-value.o
+
+REPLOBJS = src/jli.o libjl.a
+
+.SUFFIXES: .o .h .c
+
+all: jli libjl.a libjl.so
+
+install: all
+	install -d $(BINDIR)
+	install -d $(LIBDIR)
+	install jli $(BINDIR)/jl
+	install libjl.a $(LIBDIR)/libjl.a
+	install libjl.so $(LIBDIR)/libjl.so
+
+install-strip: install
+	strip $(BINDIR)/jli
+
+jli: $(REPLOBJS)
+	$(CC) $(LDFLAGS) $(REPLOBJS) -o jli
+
+libjl.so: $(JLOBJS)
+	$(CC) $(LDFLAGS) -shared $(JLOBJS) -o libjl.so
+
+libjl.a: $(JLOBJS)
+	ar r jl.a $(JLOBJS)
+
+.c.o: $*.c *.h
+	$(CC) $(CFLAGS) -c $*.c -o $*.o
+
+clean:
+	rm -f jli libjl.a libjl.so src/*.o
+

@@ -1,4 +1,14 @@
 jli
-jl.a
+libjl.a
 libjl.so
 src/*.o
+Makefile
+autom4te.cache
+config.h
+config.h.in
+config.h.in~
+config.log
+config.rpath
+config.status
+configure
+install-sh
