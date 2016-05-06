@@ -34,7 +34,7 @@ libjl.so: $(JLOBJS)
 	$(CC) $(LDFLAGS) -shared $(JLOBJS) -o libjl.so
 
 libjl.a: $(JLOBJS)
-	ar r jl.a $(JLOBJS)
+	ar r libjl.a $(JLOBJS)
 
 .c.o: $*.c *.h
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
