@@ -65,7 +65,7 @@ JLContext *JLCreateContext()
    context->levels = 0;
    context->max_levels = 1 << 15;
    context->error = 0;
-   EnterScope(context);
+   JLEnterScope(context);
    RegisterFunctions(context);
    JLDefineValue(context, "nil", NULL);
    return context;
@@ -73,7 +73,7 @@ JLContext *JLCreateContext()
 
 void JLDestroyContext(JLContext *context)
 {
-   LeaveScope(context);
+   JLLeaveScope(context);
    FreeContext(context);
 }
 
@@ -199,7 +199,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
    /* Insert bindings. */
    old_scope = context->scope;
    context->scope = (ScopeNode*)scope->value.scope;
-   EnterScope(context);
+   JLEnterScope(context);
    new_scope = context->scope;
    bp = params;
    ap = args->next;  /* Skip the name */
@@ -251,7 +251,7 @@ JLValue *EvalLambda(JLContext *context, const JLValue *lambda, JLValue *args)
 
 done_eval_lambda:
 
-   LeaveScope(context);
+   JLLeaveScope(context);
    context->scope = old_scope;
 
    return result;

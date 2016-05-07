@@ -356,12 +356,12 @@ JLValue *BeginFunc(JLContext *context, JLValue *args)
 {
    JLValue *vp;
    JLValue *result = NULL;
-   EnterScope(context);
+   JLEnterScope(context);
    for(vp = args->next; vp; vp = vp->next) {
       JLRelease(context, result);
       result = JLEvaluate(context, vp);
    }
-   LeaveScope(context);
+   JLLeaveScope(context);
    return result;
 }
 

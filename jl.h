@@ -46,6 +46,14 @@ struct JLContext *JLCreateContext();
 JLEXPORT
 void JLDestroyContext(struct JLContext *context);
 
+/** Create and enter a new lexical scope. */
+JLEXPORT
+void JLEnterScope(struct JLContext *context);
+
+/** Leave and destroy the current lexical scope. */
+JLEXPORT
+void JLLeaveScope(struct JLContext *context);
+
 /** Increase the reference count of a value.
  * @param context The context containing the value.
  * @param value The value (can be NULL).

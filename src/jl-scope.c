@@ -41,7 +41,7 @@ void ReleaseBindings(JLContext *context, BindingNode *binding)
    }
 }
 
-void EnterScope(JLContext *context)
+void JLEnterScope(JLContext *context)
 {
    ScopeNode *scope = (ScopeNode*)GetFree(context);
    scope->count = 1;
@@ -50,7 +50,7 @@ void EnterScope(JLContext *context)
    context->scope = scope;
 }
 
-void LeaveScope(JLContext *context)
+void JLLeaveScope(JLContext *context)
 {
    ScopeNode *scope = context->scope;
    context->scope = scope->next;

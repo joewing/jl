@@ -22,10 +22,6 @@ typedef struct ScopeNode {
    unsigned int count;
 } ScopeNode;
 
-void EnterScope(struct JLContext *context);
-
-void LeaveScope(struct JLContext *context);
-
 void ReleaseScope(struct JLContext *context, ScopeNode *scope);
 
 struct JLValue *Lookup(struct JLContext *context, const char *name);
