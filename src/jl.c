@@ -457,10 +457,7 @@ JLValue *JLParse(JLContext *context, const char **line)
 
    switch(**line) {
    case 0:
-      return NULL;
    case ')':
-      Error(context, "unexpected ')'");
-      *line += 1;
       return NULL;
    case '(':
       return ParseList(context, line);
