@@ -108,10 +108,12 @@ void JLDefineValue(JLContext *context, const char *name, JLValue *value)
 
 void JLDefineSpecial(JLContext *context,
                      const char *name,
-                     JLFunction func)
+                     JLFunction func,
+                     void *extra)
 {
    JLValue *result = CreateValue(context, name, JLVALUE_SPECIAL);
-   result->value.special = func;
+   result->value.special.func = func;
+   result->value.special.extra = extra;
    JLRelease(context, result);
 }
 
@@ -143,7 +145,8 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
       if(temp) {
          switch(temp->tag) {
          case JLVALUE_SPECIAL:
-            result = (temp->value.special)(context, value->value.lst);
+            result = (temp->value.special.func)(context, value->value.lst,
+                                                value->value.special.extra);
             break;
          case JLVALUE_LAMBDA:
             result = EvalLambda(context, temp, value->value.lst);
@@ -549,7 +552,8 @@ void JLPrint(const JLContext *context, const JLValue *value)
       printf(")");
       break;
    case JLVALUE_SPECIAL:
-      printf("special@%p", value->value.special);
+      printf("special@%p(%p)", value->value.special.func,
+             value->value.special.extra);
       break;
    case JLVALUE_VARIABLE:
       printf("%s", value->value.str);

@@ -23,29 +23,29 @@ static void InvalidArgumentError(JLContext *context, JLValue *args);
 static void TooManyArgumentsError(JLContext *context, JLValue *args);
 static void TooFewArgumentsError(JLContext *context, JLValue *args);
 
-static JLValue *CompareFunc(JLContext *context, JLValue *args);
-static JLValue *AddFunc(JLContext *context, JLValue *args);
-static JLValue *SubFunc(JLContext *context, JLValue *args);
-static JLValue *MulFunc(JLContext *context, JLValue *args);
-static JLValue *DivFunc(JLContext *context, JLValue *args);
-static JLValue *ModFunc(JLContext *context, JLValue *args);
-static JLValue *AndFunc(JLContext *context, JLValue *args);
-static JLValue *OrFunc(JLContext *context, JLValue *args);
-static JLValue *NotFunc(JLContext *context, JLValue *args);
-static JLValue *BeginFunc(JLContext *context, JLValue *args);
-static JLValue *ConsFunc(JLContext *context, JLValue *args);
-static JLValue *DefineFunc(JLContext *context, JLValue *args);
-static JLValue *HeadFunc(JLContext *context, JLValue *args);
-static JLValue *IfFunc(JLContext *context, JLValue *args);
-static JLValue *LambdaFunc(JLContext *context, JLValue *args);
-static JLValue *ListFunc(JLContext *context, JLValue *args);
-static JLValue *RestFunc(JLContext *context, JLValue *args);
-static JLValue *SubstrFunc(JLContext *context, JLValue *args);
-static JLValue *ConcatFunc(JLContext *context, JLValue *args);
-static JLValue *IsNumberFunc(JLContext *context, JLValue *args);
-static JLValue *IsStringFunc(JLContext *context, JLValue *args);
-static JLValue *IsListFunc(JLContext *context, JLValue *args);
-static JLValue *IsNullFunc(JLContext *context, JLValue *args);
+static JLValue *CompareFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *AddFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *SubFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *MulFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *DivFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *ModFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *AndFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *OrFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *NotFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *BeginFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *ConsFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *DefineFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *HeadFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *IfFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *LambdaFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *ListFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *RestFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *SubstrFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *ConcatFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *IsNumberFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *IsStringFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *IsListFunc(JLContext *context, JLValue *args, void *extra);
+static JLValue *IsNullFunc(JLContext *context, JLValue *args, void *extra);
 
 static InternalFunctionNode INTERNAL_FUNCTIONS[] = {
    { "=",         CompareFunc    },
@@ -116,7 +116,7 @@ void TooFewArgumentsError(JLContext *context, JLValue *args)
    Error(context, "too few arguments to %s", args->value.str);
 }
 
-JLValue *CompareFunc(JLContext *context, JLValue *args)
+JLValue *CompareFunc(JLContext *context, JLValue *args, void *extra)
 {
    const char *op = args->value.str;
    JLValue *va = NULL;
@@ -181,7 +181,7 @@ JLValue *CompareFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *AddFunc(JLContext *context, JLValue *args)
+JLValue *AddFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp;
    double sum = 0.0;
@@ -198,7 +198,7 @@ JLValue *AddFunc(JLContext *context, JLValue *args)
    return JLDefineNumber(context, NULL, sum);
 }
 
-JLValue *SubFunc(JLContext *context, JLValue *args)
+JLValue *SubFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp = args->next;
    JLValue *arg = NULL;
@@ -228,7 +228,7 @@ JLValue *SubFunc(JLContext *context, JLValue *args)
 
 }
 
-JLValue *MulFunc(JLContext *context, JLValue *args)
+JLValue *MulFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp;
    double product = 1.0;
@@ -245,7 +245,7 @@ JLValue *MulFunc(JLContext *context, JLValue *args)
    return JLDefineNumber(context, NULL, product);
 }
 
-JLValue *DivFunc(JLContext *context, JLValue *args)
+JLValue *DivFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *va = NULL;
    JLValue *vb = NULL;
@@ -276,7 +276,7 @@ div_done:
 
 }
 
-JLValue *ModFunc(JLContext *context, JLValue *args)
+JLValue *ModFunc(JLContext *context, JLValue *args, void *extra)
 {
 
    JLValue *va = NULL;
@@ -313,7 +313,7 @@ mod_done:
 
 }
 
-JLValue *AndFunc(JLContext *context, JLValue *args)
+JLValue *AndFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp;
    for(vp = args->next; vp; vp = vp->next) {
@@ -324,7 +324,7 @@ JLValue *AndFunc(JLContext *context, JLValue *args)
    return JLDefineNumber(context, NULL, 1.0);
 }
 
-JLValue *OrFunc(JLContext *context, JLValue *args)
+JLValue *OrFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp;
    for(vp = args->next; vp; vp = vp->next) {
@@ -335,7 +335,7 @@ JLValue *OrFunc(JLContext *context, JLValue *args)
    return NULL;
 }
 
-JLValue *NotFunc(JLContext *context, JLValue *args)
+JLValue *NotFunc(JLContext *context, JLValue *args, void *extra)
 {
    if(args->next == NULL) {
       TooFewArgumentsError(context, args);
@@ -352,7 +352,7 @@ JLValue *NotFunc(JLContext *context, JLValue *args)
    }
 }
 
-JLValue *BeginFunc(JLContext *context, JLValue *args)
+JLValue *BeginFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp;
    JLValue *result = NULL;
@@ -365,7 +365,7 @@ JLValue *BeginFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *ConsFunc(JLContext *context, JLValue *args)
+JLValue *ConsFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *head = NULL;
    JLValue *rest = NULL;
@@ -403,7 +403,7 @@ JLValue *ConsFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *DefineFunc(JLContext *context, JLValue *args)
+JLValue *DefineFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp = args->next;
    JLValue *result = NULL;
@@ -420,7 +420,7 @@ JLValue *DefineFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *HeadFunc(JLContext *context, JLValue *args)
+JLValue *HeadFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result = NULL;
    JLValue *vp = JLEvaluate(context, args->next);
@@ -439,7 +439,7 @@ head_done:
    return result;
 }
 
-JLValue *IfFunc(JLContext *context, JLValue *args)
+JLValue *IfFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *vp = args->next;
    if(CheckCondition(context, vp)) {
@@ -450,7 +450,7 @@ JLValue *IfFunc(JLContext *context, JLValue *args)
    return NULL;
 }
 
-JLValue *LambdaFunc(JLContext *context, JLValue *args)
+JLValue *LambdaFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result;
    JLValue *scope;
@@ -472,7 +472,7 @@ JLValue *LambdaFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *ListFunc(JLContext *context, JLValue *args)
+JLValue *ListFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result = NULL;
    if(args->next) {
@@ -490,7 +490,7 @@ JLValue *ListFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *RestFunc(JLContext *context, JLValue *args)
+JLValue *RestFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result = NULL;
    JLValue *vp = JLEvaluate(context, args->next);
@@ -512,7 +512,7 @@ rest_done:
    return result;
 }
 
-JLValue *SubstrFunc(JLContext *context, JLValue *args)
+JLValue *SubstrFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result   = NULL;
    JLValue *str      = NULL;
@@ -571,7 +571,7 @@ substr_done:
 
 }
 
-JLValue *ConcatFunc(JLContext *context, JLValue *args)
+JLValue *ConcatFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *result = CreateValue(context, NULL, JLVALUE_STRING);
    JLValue *vp;
@@ -601,7 +601,7 @@ JLValue *ConcatFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *IsNumberFunc(JLContext *context, JLValue *args)
+JLValue *IsNumberFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *arg = NULL;
    JLValue *result = NULL;
@@ -623,7 +623,7 @@ JLValue *IsNumberFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *IsStringFunc(JLContext *context, JLValue *args)
+JLValue *IsStringFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *arg = NULL;
    JLValue *result = NULL;
@@ -646,7 +646,7 @@ JLValue *IsStringFunc(JLContext *context, JLValue *args)
 
 }
 
-JLValue *IsListFunc(JLContext *context, JLValue *args)
+JLValue *IsListFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *arg = NULL;
    JLValue *result = NULL;
@@ -668,7 +668,7 @@ JLValue *IsListFunc(JLContext *context, JLValue *args)
    return result;
 }
 
-JLValue *IsNullFunc(JLContext *context, JLValue *args)
+JLValue *IsNullFunc(JLContext *context, JLValue *args, void *extra)
 {
    JLValue *arg = NULL;
 
@@ -695,7 +695,7 @@ void RegisterFunctions(JLContext *context)
    size_t i;
    for(i = 0; i < INTERNAL_FUNCTION_COUNT; i++) {
       JLDefineSpecial(context, INTERNAL_FUNCTIONS[i].name,
-                      INTERNAL_FUNCTIONS[i].function);
+                      INTERNAL_FUNCTIONS[i].function, NULL);
    }
 }
 

@@ -28,11 +28,13 @@ struct JLContext;
 /** The type of special functions.
  * @param context The JL context.
  * @param args A list of arguments to the function, including its name.
+ * @param extra Extra parameter from JLDefineSpecial.
  * @return The result, which should be retained (it will be freed if
  *         not needed).
  */
 typedef struct JLValue *(*JLFunction)(struct JLContext *context,
-                                      struct JLValue *args);
+                                      struct JLValue *args,
+                                      void *extra);
 
 /** Create a context for running JL programs.
  * @return The context.
@@ -87,11 +89,13 @@ void JLDefineValue(struct JLContext *context,
  * @param context The context in which to define the function.
  * @param name The name of the function.
  * @param func The function code.
+ * @param extra Extra parameter to pass to func.
  */
 JLEXPORT
 void JLDefineSpecial(struct JLContext *context,
                      const char *name,
-                     JLFunction func);
+                     JLFunction func,
+                     void *extra);
 
 /** Define a number.
  * This will add a number to the current scope.

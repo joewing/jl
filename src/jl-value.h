@@ -19,13 +19,19 @@ typedef char JLValueType;
 #define JLVALUE_SCOPE      6     /**< A scope (internal use). */
 #define JLVALUE_VARIABLE   7     /**< A variable. */
 
+/** Special function and extra parameter. */
+typedef struct SpecialFunction {
+   JLFunction func;
+   void *extra;
+} SpecialFunction;
+
 /** Values in the JL environment.
  * Note that these are reference counted.
  */
 typedef struct JLValue {
    union {
       struct JLValue *lst;
-      JLFunction special;
+      SpecialFunction special;
       char *str;
       double number;
       void *scope;

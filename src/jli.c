@@ -12,7 +12,8 @@
 #include <stdlib.h>
 
 static struct JLValue *PrintFunc(struct JLContext *context,
-                                 struct JLValue *args)
+                                 struct JLValue *args,
+                                 void *extra)
 {
    struct JLValue *vp;
    for(vp = JLGetNext(args); vp; vp = JLGetNext(vp)) {
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
    }
 
    context = JLCreateContext();
-   JLDefineSpecial(context, "print", PrintFunc);
+   JLDefineSpecial(context, "print", PrintFunc, NULL);
 
    if(filename) {
       FILE *fd = fopen(filename, "r");
