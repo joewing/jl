@@ -5,8 +5,6 @@ CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 BINDIR = $(DESTDIR)@BINDIR@
 LIBDIR = $(DESTDIR)@LIBDIR@
-CFLAGS=-O2 -Wall -Werror -I. -fpic -fvisibility=hidden
-LDFLAGS=
 
 JLOBJS = \
     src/jl.o src/jl-context.o src/jl-func.o src/jl-scope.o src/jl-value.o

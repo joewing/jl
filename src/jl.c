@@ -146,7 +146,7 @@ JLValue *JLEvaluate(JLContext *context, JLValue *value)
          switch(temp->tag) {
          case JLVALUE_SPECIAL:
             result = (temp->value.special.func)(context, value->value.lst,
-                                                value->value.special.extra);
+                                                temp->value.special.extra);
             break;
          case JLVALUE_LAMBDA:
             result = EvalLambda(context, temp, value->value.lst);
