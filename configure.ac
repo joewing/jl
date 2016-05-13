@@ -8,6 +8,17 @@ AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_INSTALL
 
+CFLAGS="$CFLAGS -I. -fpic -fvisibility=hidden"
+
+AC_ARG_ENABLE(debug,
+    AC_HELP_STRING([--enable-debug], [create a debug build]) )
+if test "$enable_debug" = "yes"; then
+    CFLAGS="$CFLAGS -g -Wall -Werror"
+    LDFLAGS="$LDFLAGS -g"
+else
+    enable_debug="no"
+fi
+
 PACKAGE=jl
 
 AC_SUBST(CFLAGS)
