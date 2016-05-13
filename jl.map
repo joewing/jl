@@ -2,6 +2,8 @@
 JL_1.0 {
    global:  JLCreateContext;
             JLDestroyContext;
+            JLEnterScope;
+            JLLeaveScope;
             JLRetain;
             JLRelease;
             JLDefineValue;
