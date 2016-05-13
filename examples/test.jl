@@ -106,5 +106,19 @@
 
 (assert (= ((lambda (a b) (+ a b 1)) 2 3) 6))
 
+; Test concat and whitespace before closing ')'.
+(define repeat
+    (lambda (str i)
+        (if (= i 1)
+            str
+            (if (> i 0)
+                (concat (repeat str (- i 1)) "," str)
+                ""
+            )
+        )
+    )
+)
+(assert (= "0123456789,0123456789,0123456789" (repeat "0123456789" 3)))
+
 (print "\ndone\n")
 
