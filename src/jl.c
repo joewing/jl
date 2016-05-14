@@ -18,6 +18,7 @@ static JLValue *EvalLambda(JLContext *context,
                            JLValue *args);
 static JLValue *ParseLiteral(JLContext *context, const char **line);
 static JLValue *ParseList(JLContext *context, const char **line);
+static JLValue *ParseExpression(JLContext *context, const char **line);
 
 void JLRetain(JLContext *context, JLValue *value)
 {
@@ -419,7 +420,7 @@ JLValue *ParseList(JLContext *context, const char **line)
    item = &result->value.lst;
 
    while(**line && **line != ')') {
-      JLValue *temp = JLParse(context, line);
+      JLValue *temp = ParseExpression(context, line);
       if(temp == NULL) {
          break;
       }
@@ -439,9 +440,8 @@ JLValue *ParseList(JLContext *context, const char **line)
 
 }
 
-JLValue *JLParse(JLContext *context, const char **line)
+JLValue *ParseExpression(JLContext *context, const char **line)
 {
-
    /* Skip leading white-space. */
    for(;;) {
       if(**line == ';') {
@@ -467,7 +467,16 @@ JLValue *JLParse(JLContext *context, const char **line)
    default:
       return ParseLiteral(context, line);
    }
+}
 
+JLValue *JLParse(JLContext *context, const char **line)
+{
+   JLValue *result = ParseExpression(context, line);
+   if(**line == ')') {
+      Error(context, "unexpected ')'");
+      *line += 1;
+   }
+   return result;
 }
 
 char JLIsNumber(JLValue *value)
